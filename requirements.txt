@@ -1,0 +1,4 @@
+watchdog==3.0.0
+streamlit>=1.28.0
+streamlit-aggrid>=0.3.4
+pandas>=1.5.0

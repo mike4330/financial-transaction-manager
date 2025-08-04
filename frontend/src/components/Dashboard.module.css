@@ -1,0 +1,7 @@
+/* Dashboard grid styles */
+.grid {
+  display: grid;
+  padding: 1rem;
+  background-color: #f9fafb;
+  min-height: 100vh;
+}
