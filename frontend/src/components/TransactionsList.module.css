@@ -1,0 +1,454 @@
+/* Time range control */
+.timeRangeContainer {
+  margin-bottom: 1rem;
+}
+
+/* Filters and search */
+.filtersContainer {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.searchContainer {
+  flex: 1;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.filterContainer {
+  display: flex;
+  gap: 0.5rem;
+  min-width: 600px;
+  align-items: center;
+}
+
+.categoryFilter {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.filterIndicator {
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: normal;
+  margin-left: 0.5rem;
+}
+
+.clearFiltersButton {
+  padding: 0.5rem 1rem;
+  background-color: #f97316;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  margin-left: 0.5rem;
+}
+
+.clearFiltersButton:hover {
+  background-color: #ea580c;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.clearFiltersButton:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Summary stats */
+.summaryContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.statCard {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #3b82f6;
+  margin-bottom: 0.25rem;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* Color legend */
+.colorLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.colorLegendItem {
+  display: flex;
+  justify-content: center;
+}
+
+/* Bulk actions bar */
+.bulkActions {
+  padding: 0.75rem 1rem;
+  background-color: #f3f4f6;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.selectedCount {
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.bulkSelect {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+/* Loading and error states */
+.loading {
+  text-align: center;
+  padding: 2rem;
+}
+
+.error {
+  text-align: center;
+  padding: 2rem;
+  color: #dc2626;
+  background-color: #fef2f2;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+/* Table styles */
+.tableContainer {
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.tableHeader {
+  background-color: #f9fafb;
+}
+
+.tableHeaderCell {
+  padding: 0.75rem 0.5rem;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sortIcon {
+  margin-left: 0.25rem;
+}
+
+.tableRow {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.tableRowEven {
+  background-color: white;
+}
+
+.tableRowOdd {
+  background-color: #fafafa;
+}
+
+.tableCell {
+  padding: 0.75rem 0.5rem;
+}
+
+.tableCellAmount {
+  text-align: right;
+  font-weight: 600;
+}
+
+.amountPositive {
+  color: #059669;
+}
+
+.amountNegative {
+  color: #dc2626;
+}
+
+.tableCellDescription {
+  max-width: 200px;
+}
+
+.tableCellAccount {
+  max-width: 120px;
+}
+
+.tableCellPayee {
+  max-width: 150px;
+}
+
+/* Clickable row styles */
+.clickableRow {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.clickableRow:hover {
+  background-color: #f8fafc !important;
+}
+
+.cellWithExpander {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.expandIcon {
+  font-size: 0.75rem;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+  margin-left: 0.5rem;
+}
+
+.expandIconOpen {
+  transform: rotate(90deg);
+}
+
+/* Expanded row styles */
+.expandedRow {
+  background-color: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+}
+
+.expandedContent {
+  padding: 1rem 2rem;
+  border: none;
+}
+
+.expandedDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detailItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.detailLabel {
+  font-weight: 600;
+  color: #374151;
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.detailValue {
+  color: #6b7280;
+  word-break: break-word;
+  flex: 1;
+}
+
+/* Responsive design for expanded rows */
+@media (max-width: 768px) {
+  .expandedContent {
+    padding: 1rem;
+  }
+  
+  .detailItem {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .detailLabel {
+    min-width: auto;
+    font-size: 0.875rem;
+  }
+  
+  .detailValue {
+    font-size: 0.875rem;
+    padding-left: 0;
+  }
+}
+
+.tableCellCategory {
+  min-width: 120px;
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.categorySelect {
+  width: 100%;
+  padding: 0.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.categorySpan {
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.categorized {
+  background-color: #f3f4f6;
+}
+
+.categoryColored {
+  border: 1px solid;
+  font-weight: 500;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition: all 0.2s ease;
+}
+
+.categoryColored:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.subcategoryColored {
+  border: 1px solid;
+  font-weight: 500;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+}
+
+.subcategoryColored:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.uncategorized {
+  background-color: #fef2f2;
+}
+
+.subcategorySpanDisabled {
+  cursor: not-allowed;
+  color: #9ca3af;
+}
+
+/* Edit container and actions */
+.editContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.editActions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+.editButton {
+  padding: 0.25rem;
+  border: 1px solid;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: bold;
+  min-width: 1.5rem;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.editButtonApply {
+  background-color: #dcfce7;
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.editButtonApply:hover {
+  background-color: #16a34a;
+  color: white;
+}
+
+.editButtonCancel {
+  background-color: #fef2f2;
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.editButtonCancel:hover {
+  background-color: #dc2626;
+  color: white;
+}
+
+/* Pagination styles */
+.paginationContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 1rem;
+}
+
+.paginationInfo {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.paginationButton {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  background-color: white;
+  color: #374151;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.paginationButton:hover:not(:disabled) {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.paginationButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #f9fafb;
+}

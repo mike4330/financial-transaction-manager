@@ -1,0 +1,129 @@
+/* Summary container */
+.summaryContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.statCard {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.statLabel {
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Tree view styles */
+.treeContainer {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.categoryGroup {
+  margin-bottom: 1.5rem;
+}
+
+.categoryItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 0.5rem;
+}
+
+.categoryName {
+  font-weight: bold;
+  color: #1f2937;
+  font-size: 1rem;
+}
+
+.categoryStats {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.subcategoryList {
+  margin-left: 1rem;
+}
+
+.subcategoryItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  margin-bottom: 0.25rem;
+}
+
+.subcategoryPrefix {
+  color: #9ca3af;
+  margin-right: 0.5rem;
+  font-weight: bold;
+}
+
+.subcategoryName {
+  color: #374151;
+  flex-grow: 1;
+}
+
+.subcategoryButton {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  flex-grow: 1;
+}
+
+.subcategoryButton:hover {
+  color: #1d4ed8;
+  background-color: #f3f4f6;
+  text-decoration: none;
+}
+
+.subcategoryButton:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.subcategoryStats {
+  color: #6b7280;
+  font-size: 0.8125rem;
+  margin-left: 1rem;
+}
+
+/* Loading and error states */
+.loading, .error {
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
+.error {
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+}
