@@ -70,6 +70,31 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
+.collapseAllButton {
+  padding: 0.5rem 1rem;
+  background-color: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  margin-left: 0.5rem;
+}
+
+.collapseAllButton:hover {
+  background-color: #4b5563;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.collapseAllButton:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
 /* Summary stats */
 .summaryContainer {
   display: grid;
@@ -132,6 +157,164 @@
   border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 0.875rem;
+}
+
+/* Bulk categorization flyout menu */
+.bulkCategoryContainer {
+  position: relative;
+}
+
+.bulkCategoryButton {
+  padding: 0.5rem 1rem;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bulkCategoryButton:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.bulkCategoryMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.5rem;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  min-width: 400px;
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.bulkMenuHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+.bulkMenuClose {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+}
+
+.bulkMenuClose:hover {
+  color: #374151;
+}
+
+.bulkMenuContent {
+  padding: 0;
+}
+
+.bulkCategoryList {
+  display: flex;
+  min-height: 300px;
+}
+
+.bulkMenuSection {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: 320px;
+}
+
+.bulkMenuSection h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bulkCategoryItem {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.125rem;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.bulkCategoryItem:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.bulkCategorySelected {
+  background-color: #dbeafe !important;
+  border-color: #3b82f6 !important;
+  color: #1d4ed8;
+  font-weight: 500;
+}
+
+.bulkSubcategoryList {
+  border-left: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+.bulkSubcategoryItem {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.75rem;
+  margin-bottom: 0.125rem;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.bulkSubcategoryItem:hover {
+  background-color: #3b82f6;
+  color: white;
+  transform: translateX(2px);
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+  .bulkCategoryMenu {
+    min-width: 320px;
+    max-height: 300px;
+  }
+  
+  .bulkCategoryList {
+    flex-direction: column;
+    min-height: auto;
+  }
+  
+  .bulkSubcategoryList {
+    border-left: none;
+    border-top: 1px solid #e5e7eb;
+  }
 }
 
 /* Loading and error states */
@@ -203,10 +386,6 @@
 
 .amountNegative {
   color: #dc2626;
-}
-
-.tableCellDescription {
-  max-width: 200px;
 }
 
 .tableCellAccount {

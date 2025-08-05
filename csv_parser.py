@@ -268,6 +268,8 @@ class CSVParser:
             return "Dividend"
         elif "REINVESTMENT" in action_upper:
             return "Reinvestment"
+        elif any(keyword in action_upper for keyword in ["DIVIDEND TAX", "TAX WITHHELD", "WITHHOLDING TAX"]):
+            return "Dividend Taxes"
         
         # Transfer transactions
         elif any(keyword in action_upper for keyword in ["TRANSFERRED FROM", "TRANSFERRED TO"]):
@@ -309,6 +311,8 @@ class CSVParser:
             return "ATM"
         
         # Fee transactions
+        elif any(keyword in action_upper for keyword in ["BROKERAGE FEE", "BROKER FEE", "TRADING FEE"]):
+            return "Brokerage Fee"
         elif any(keyword in action_upper for keyword in ["FEE", "CHARGE"]):
             return "Fee"
         
@@ -383,7 +387,7 @@ class CSVParser:
                     symbol = (row.get('Symbol') or '').strip() or None
                     
                     # Rule: Only investment transactions should have payee as None and symbol populated
-                    is_investment = enhanced_type in ["Investment Trade", "Dividend", "Reinvestment"] or symbol is not None
+                    is_investment = enhanced_type in ["Investment Trade", "Dividend", "Reinvestment", "Dividend Taxes", "Brokerage Fee"] or symbol is not None
                     
                     # Convert dates to ISO format
                     run_date_iso = self.convert_date_to_iso((row.get('Run Date') or '').strip())

@@ -17,6 +17,7 @@ export interface TransactionsPreferences {
   showAllColumns: boolean;
   compactRows: boolean;
   highlightUncategorized: boolean;
+  hideInvestments: boolean;
 }
 
 export interface GlobalPreferences {
@@ -53,7 +54,8 @@ const defaultTransactionsPreferences: TransactionsPreferences = {
   defaultSortDirection: 'desc',
   showAllColumns: true,
   compactRows: false,
-  highlightUncategorized: true
+  highlightUncategorized: true,
+  hideInvestments: true // Hide investments by default
 };
 
 const defaultGlobalPreferences: GlobalPreferences = {

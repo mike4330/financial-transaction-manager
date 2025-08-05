@@ -1,0 +1,32 @@
+{
+  "email": {
+    "address": "your-email@gmail.com",
+    "password": "your-app-password",
+    "imap_server": "imap.gmail.com",
+    "imap_port": 993
+  },
+  "search": {
+    "days_back": 90,
+    "paypal_senders": [
+      "service@paypal.com",
+      "paypal@paypal.com",
+      "noreply@paypal.com"
+    ],
+    "keywords": [
+      "Pay in 4",
+      "PayPal Pay in 4",
+      "installment",
+      "payment plan"
+    ]
+  },
+  "output": {
+    "csv_directory": "./transactions/",
+    "filename_prefix": "paypal_payin4_",
+    "include_raw_email": false
+  },
+  "mapping": {
+    "default_account": "PayPal Pay in 4",
+    "default_category": "Shopping",
+    "default_subcategory": "Online"
+  }
+}

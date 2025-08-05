@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Budget.module.css';
+import { TransactionModal } from './TransactionModal';
 
 interface BudgetItem {
   id: string;
@@ -34,6 +35,14 @@ const Budget: React.FC = () => {
   const [editValue, setEditValue] = useState<string>('');
   const [availableMonths, setAvailableMonths] = useState<{year: number, month: number}[]>([]);
   const [currentBudgetIndex, setCurrentBudgetIndex] = useState<number>(0);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<{
+    category: string;
+    subcategory: string;
+    startDate: string;
+    endDate: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchAvailableMonths = async () => {
@@ -41,9 +50,21 @@ const Budget: React.FC = () => {
         const response = await fetch('/api/budget/available-months');
         if (response.ok) {
           const data = await response.json();
-          setAvailableMonths(data.available_months || []);
-          // Set current budget index to show the first (most recent) budget
-          setCurrentBudgetIndex(0);
+          const months = data.available_months || [];
+          setAvailableMonths(months);
+          
+          // Find the current month's budget
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const currentMonth = now.getMonth() + 1; // getMonth() returns 0-11, but we need 1-12
+          
+          const currentMonthIndex = months.findIndex(
+            (month: {year: number, month: number}) => 
+              month.year === currentYear && month.month === currentMonth
+          );
+          
+          // Use current month if available, otherwise use the most recent (index 0)
+          setCurrentBudgetIndex(currentMonthIndex >= 0 ? currentMonthIndex : 0);
         }
       } catch (err) {
         console.error('Error fetching available months:', err);
@@ -240,6 +261,34 @@ const Budget: React.FC = () => {
       console.error('Error with auto-update:', err);
       alert(`Auto-update failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
+  };
+
+  // Progress bar click handler for drilldown
+  const handleProgressBarClick = (item: BudgetItem) => {
+    if (!budgetInfo) return;
+    
+    // Calculate date range for the current budget month
+    const year = budgetInfo.year;
+    const month = budgetInfo.month;
+    
+    const startDate = new Date(year, month - 1, 1); // month - 1 because Date month is 0-based
+    const endDate = new Date(year, month, 0); // Last day of the month
+    
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    const monthName = monthNames[month - 1];
+    
+    setSelectedCategory({
+      category: item.category,
+      subcategory: item.subcategory || '',
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+      title: `${item.category}${item.subcategory ? ` - ${item.subcategory}` : ''} - ${monthName} ${year}`
+    });
+    setModalOpen(true);
   };
 
   // Navigation functions
@@ -462,79 +511,85 @@ const Budget: React.FC = () => {
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>💼 Income</h3>
           {incomeCategories.map(categoryName => (
-            <div key={categoryName} className={styles.categoryGroup}>
+            <div key={categoryName} className={styles.categoryContainer}>
               <div className={styles.categoryHeader}>{categoryName}</div>
-              <div className={styles.subcategoryList}>
-                {groupedByCategory[categoryName].map(item => (
-                  <div key={item.id} className={styles.budgetItem}>
-                    <div className={styles.itemHeader}>
-                      <div className={styles.categoryInfo}>
-                        <span className={styles.subcategory}>{item.subcategory}</span>
-                      </div>
-                      <div className={styles.amounts}>
-                        <span className={styles.actualAmount}>${item.actual.toLocaleString()}</span>
-                        <span className={styles.budgetedAmount}>/ </span>
-                        {editingItem === item.id ? (
-                          <div className={styles.editContainer}>
-                            <input
-                              type="number"
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              className={styles.editInput}
-                              min="0"
-                              step="0.01"
-                              autoFocus
-                            />
-                            <button 
-                              onClick={() => acceptEdit(item.id)}
-                              className={styles.acceptButton}
-                              title="Accept changes"
-                            >
-                              ✓
-                            </button>
-                            <button 
-                              onClick={cancelEditing}
-                              className={styles.cancelButton}
-                              title="Cancel changes"
-                            >
-                              ✕
-                            </button>
-                            <button 
-                              onClick={() => handleAutoUpdate(item.id)}
-                              className={styles.autoButton}
-                              title="Auto-update from transactions"
-                            >
-                              Auto
-                            </button>
-                          </div>
-                        ) : (
-                          <span 
-                            className={styles.budgetedAmountEditable}
-                            onClick={() => startEditing(item.id, item.budgeted)}
-                            title="Click to edit budget amount"
+              {groupedByCategory[categoryName].map(item => (
+                <div key={item.id} className={styles.subcategoryItem}>
+                  <div className={styles.subcategoryHeader}>
+                    <span className={styles.subcategoryName}>{item.subcategory}</span>
+                    <div className={styles.amounts}>
+                      <span className={styles.actualAmount}>${item.actual.toLocaleString()}</span>
+                      <span className={styles.budgetedAmount}>/ </span>
+                      {editingItem === item.id ? (
+                        <div className={styles.editContainer}>
+                          <input
+                            type="number"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className={styles.editInput}
+                            min="0"
+                            step="0.01"
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => acceptEdit(item.id)}
+                            className={styles.acceptButton}
+                            title="Accept changes"
                           >
-                            ${item.budgeted.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className={styles.progressContainer}>
-                      <div className={styles.progressBar}>
-                        <div 
-                          className={styles.progressFill}
-                          style={{ 
-                            width: `${Math.min(calculateProgress(item.actual, item.budgeted, item.type), 100)}%`,
-                            backgroundColor: getProgressColor(item.actual, item.budgeted, item.type)
-                          }}
-                        />
-                      </div>
-                      <div className={styles.variance}>
-                        {getVarianceText(item.actual, item.budgeted, item.type)}
-                      </div>
+                            ✓
+                          </button>
+                          <button 
+                            onClick={cancelEditing}
+                            className={styles.cancelButton}
+                            title="Cancel changes"
+                          >
+                            ✕
+                          </button>
+                          <button 
+                            onClick={() => handleAutoUpdate(item.id)}
+                            className={styles.autoButton}
+                            title="Auto-update from transactions"
+                          >
+                            Auto
+                          </button>
+                        </div>
+                      ) : (
+                        <span 
+                          className={styles.budgetedAmountEditable}
+                          onClick={() => startEditing(item.id, item.budgeted)}
+                          title="Click to edit budget amount"
+                        >
+                          ${item.budgeted.toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className={styles.progressContainer}>
+                    <div 
+                      className={styles.progressBar}
+                      onClick={() => handleProgressBarClick(item)}
+                      title="Click to view transactions"
+                    >
+                      <div 
+                        className={styles.progressFill}
+                        style={{ 
+                          width: `${Math.min(calculateProgress(item.actual, item.budgeted, item.type), 100)}%`,
+                          backgroundColor: getProgressColor(item.actual, item.budgeted, item.type)
+                        }}
+                      />
+                    </div>
+                    <div className={styles.progressInfo}>
+                      <span className={styles.currentAmount}>${item.actual.toLocaleString()}</span>
+                      <span className={styles.separator}>|</span>
+                      <span className={styles.budgetAmount}>${item.budgeted.toLocaleString()}</span>
+                      <span className={styles.separator}>|</span>
+                      <span className={styles.variance}>
+                        {getVarianceText(item.actual, item.budgeted, item.type)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -543,83 +598,100 @@ const Budget: React.FC = () => {
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>💸 Expenses</h3>
           {expenseCategories.map(categoryName => (
-            <div key={categoryName} className={styles.categoryGroup}>
+            <div key={categoryName} className={styles.categoryContainer}>
               <div className={styles.categoryHeader}>{categoryName}</div>
-              <div className={styles.subcategoryList}>
-                {groupedByCategory[categoryName].map(item => (
-                  <div key={item.id} className={styles.budgetItem}>
-                    <div className={styles.itemHeader}>
-                      <div className={styles.categoryInfo}>
-                        <span className={styles.subcategory}>{item.subcategory}</span>
-                      </div>
-                      <div className={styles.amounts}>
-                        <span className={styles.actualAmount}>${item.actual.toLocaleString()}</span>
-                        <span className={styles.budgetedAmount}>/ </span>
-                        {editingItem === item.id ? (
-                          <div className={styles.editContainer}>
-                            <input
-                              type="number"
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              className={styles.editInput}
-                              min="0"
-                              step="0.01"
-                              autoFocus
-                            />
-                            <button 
-                              onClick={() => acceptEdit(item.id)}
-                              className={styles.acceptButton}
-                              title="Accept changes"
-                            >
-                              ✓
-                            </button>
-                            <button 
-                              onClick={cancelEditing}
-                              className={styles.cancelButton}
-                              title="Cancel changes"
-                            >
-                              ✕
-                            </button>
-                            <button 
-                              onClick={() => handleAutoUpdate(item.id)}
-                              className={styles.autoButton}
-                              title="Auto-update from transactions"
-                            >
-                              Auto
-                            </button>
-                          </div>
-                        ) : (
-                          <span 
-                            className={styles.budgetedAmountEditable}
-                            onClick={() => startEditing(item.id, item.budgeted)}
-                            title="Click to edit budget amount"
+              {groupedByCategory[categoryName].map(item => (
+                <div key={item.id} className={styles.subcategoryItem}>
+                  <div className={styles.subcategoryHeader}>
+                    <span className={styles.subcategoryName}>{item.subcategory}</span>
+                    <div className={styles.amounts}>
+                      <span className={styles.actualAmount}>${item.actual.toLocaleString()}</span>
+                      <span className={styles.budgetedAmount}>/ </span>
+                      {editingItem === item.id ? (
+                        <div className={styles.editContainer}>
+                          <input
+                            type="number"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className={styles.editInput}
+                            min="0"
+                            step="0.01"
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => acceptEdit(item.id)}
+                            className={styles.acceptButton}
+                            title="Accept changes"
                           >
-                            ${item.budgeted.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className={styles.progressContainer}>
-                      <div className={styles.progressBar}>
-                        <div 
-                          className={styles.progressFill}
-                          style={{ 
-                            width: `${Math.min(calculateProgress(item.actual, item.budgeted, item.type), 100)}%`,
-                            backgroundColor: getProgressColor(item.actual, item.budgeted, item.type)
-                          }}
-                        />
-                      </div>
-                      <div className={styles.variance}>
-                        {getVarianceText(item.actual, item.budgeted, item.type)}
-                      </div>
+                            ✓
+                          </button>
+                          <button 
+                            onClick={cancelEditing}
+                            className={styles.cancelButton}
+                            title="Cancel changes"
+                          >
+                            ✕
+                          </button>
+                          <button 
+                            onClick={() => handleAutoUpdate(item.id)}
+                            className={styles.autoButton}
+                            title="Auto-update from transactions"
+                          >
+                            Auto
+                          </button>
+                        </div>
+                      ) : (
+                        <span 
+                          className={styles.budgetedAmountEditable}
+                          onClick={() => startEditing(item.id, item.budgeted)}
+                          title="Click to edit budget amount"
+                        >
+                          ${item.budgeted.toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className={styles.progressContainer}>
+                    <div 
+                      className={styles.progressBar}
+                      onClick={() => handleProgressBarClick(item)}
+                      title="Click to view transactions"
+                    >
+                      <div 
+                        className={styles.progressFill}
+                        style={{ 
+                          width: `${Math.min(calculateProgress(item.actual, item.budgeted, item.type), 100)}%`,
+                          backgroundColor: getProgressColor(item.actual, item.budgeted, item.type)
+                        }}
+                      />
+                    </div>
+                    <div className={styles.progressInfo}>
+                      <span className={styles.currentAmount}>${item.actual.toLocaleString()}</span>
+                      <span className={styles.separator}>|</span>
+                      <span className={styles.budgetAmount}>${item.budgeted.toLocaleString()}</span>
+                      <span className={styles.separator}>|</span>
+                      <span className={styles.variance}>
+                        {getVarianceText(item.actual, item.budgeted, item.type)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>
       </div>
+      
+      {/* Transaction Modal for drilldown */}
+      <TransactionModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        category={selectedCategory?.category}
+        subcategory={selectedCategory?.subcategory}
+        startDate={selectedCategory?.startDate}
+        endDate={selectedCategory?.endDate}
+        title={selectedCategory?.title}
+      />
     </div>
   );
 };

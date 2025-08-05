@@ -1,7 +1,7 @@
 export interface DashboardCard {
   id: string;
   title: string;
-  visualization: 'timeseries' | 'summary' | 'stat' | 'percentage';
+  visualization: 'timeseries' | 'summary' | 'stat' | 'percentage' | 'stacked';
   data: {
     category: string;
     subcategory?: string;
@@ -25,6 +25,7 @@ export interface DashboardCard {
     showAverage?: boolean;
     currency?: boolean;
     percentage?: boolean;
+    stacked?: boolean;
   };
 }
 

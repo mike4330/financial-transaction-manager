@@ -228,6 +228,16 @@ const DisplayPreferences: React.FC<DisplayPreferencesProps> = ({ isOpen, onClose
                     Highlight uncategorized transactions
                   </label>
                 </div>
+                <div className={styles.checkboxGroup}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={transactionsPreferences.hideInvestments}
+                      onChange={(e) => updateTransactionsPreferences({ hideInvestments: e.target.checked })}
+                    />
+                    Hide investment transactions
+                  </label>
+                </div>
               </div>
             </>
           )}

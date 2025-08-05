@@ -141,11 +141,80 @@ export const defaultDashboardConfig: DashboardConfig = {
         showAverage: true,
         percentage: true
       }
+    },
+    {
+      id: 'entertainment-online-services',
+      title: 'Entertainment/Online Services',
+      visualization: 'timeseries',
+      data: { 
+        category: 'Entertainment',
+        subcategory: 'Online Services'
+      },
+      layout: { row: 5, col: 1, width: 1, height: 1 },
+      config: { 
+        chartType: 'bar', 
+        color: '#a855f7',
+        showTotal: true,
+        showAverage: true,
+        currency: true
+      }
+    },
+    {
+      id: 'spaxx-dividends',
+      title: 'SPAXX Dividends',
+      visualization: 'timeseries',
+      data: { 
+        category: 'Income',
+        subcategory: 'Dividends',
+        endpoint: '/api/transactions?symbol=SPAXX&type=Dividend'
+      },
+      layout: { row: 5, col: 2, width: 1, height: 1 },
+      config: { 
+        chartType: 'line', 
+        color: '#16a34a',
+        showTotal: true,
+        showAverage: true,
+        currency: true
+      }
+    },
+    {
+      id: 'kids-spending-by-subcategory',
+      title: 'Kids Spending by Subcategory',
+      visualization: 'stacked',
+      data: { 
+        category: 'Kids'
+      },
+      layout: { row: 6, col: 1, width: 2, height: 1 },
+      config: { 
+        chartType: 'bar', 
+        color: '#ec4899',
+        showTotal: true,
+        showAverage: false,
+        currency: true,
+        stacked: true
+      }
+    },
+    {
+      id: 'personal-spending-by-subcategory',
+      title: 'Personal Spending by Subcategory',
+      visualization: 'stacked',
+      data: { 
+        category: 'Personal Spending'
+      },
+      layout: { row: 7, col: 1, width: 2, height: 1 },
+      config: { 
+        chartType: 'bar', 
+        color: '#8b5cf6',
+        showTotal: true,
+        showAverage: false,
+        currency: true,
+        stacked: true
+      }
     }
   ],
   grid: {
     columns: 2,
-    rows: 4,
+    rows: 7,
     gap: '1rem'
   }
 };

@@ -6,6 +6,7 @@ export interface ChartConfig {
   subcategory: string;
   color: string;
   enabled: boolean;
+  endpoint?: string; // Custom API endpoint override
 }
 
 export const CHART_CONFIGS: ChartConfig[] = [
