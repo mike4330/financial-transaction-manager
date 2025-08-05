@@ -1,8 +1,9 @@
 import React from 'react';
 import { DashboardCard as DashboardCardType } from '../types/dashboard';
 import { useTimeRange } from '../contexts/TimeRangeContext';
-import { GenericChart } from './GenericChart';
+import { MemoizedGenericChart as GenericChart } from './GenericChart';
 import { PercentageChart } from './PercentageChart';
+import StackedChart from './StackedChart';
 import type { ChartConfig } from '../config/chartConfig';
 import StatCard from './StatCard';
 import SummaryCard from './SummaryCard';
@@ -31,7 +32,8 @@ const DashboardCard: React.FC<DashboardCardProps> = ({ card }) => {
           category: card.data.category,
           subcategory: card.data.subcategory || '',
           color: card.config?.color || '#3b82f6',
-          enabled: true
+          enabled: true,
+          endpoint: card.data.endpoint // Pass through custom endpoint if provided
         };
         
         return <GenericChart config={chartConfig} />;
@@ -56,6 +58,16 @@ const DashboardCard: React.FC<DashboardCardProps> = ({ card }) => {
             title={card.title}
             category={card.data.category}
             subcategory={card.data.subcategory}
+          />
+        );
+      
+      case 'stacked':
+        return (
+          <StackedChart
+            category={card.data.category}
+            title={card.title}
+            color={card.config?.color}
+            currency={card.config?.currency}
           />
         );
       

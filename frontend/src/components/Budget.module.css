@@ -147,66 +147,58 @@
   padding-bottom: 0.5rem;
 }
 
-.categoryGroup {
+/* Category container - single gray box for each category */
+.categoryContainer {
   margin-bottom: 1.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
-.categoryGroup:last-child {
+.categoryContainer:last-child {
   margin-bottom: 0;
 }
 
+/* Category header inside the container */
 .categoryHeader {
   font-size: 1.125rem;
   font-weight: 600;
   color: #374151;
-  margin-bottom: 0.75rem;
-  padding: 0.5rem 0.75rem;
+  padding: 1rem 1.25rem;
   background: #f9fafb;
-  border-left: 4px solid #3b82f6;
-  border-radius: 4px;
+  border-bottom: 1px solid #e5e7eb;
+  margin: 0;
 }
 
-.subcategoryList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+/* Individual subcategory items within the container */
+.subcategoryItem {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s ease;
 }
 
-.budgetItem {
-  padding: 1rem;
-  border: 1px solid #f3f4f6;
-  border-radius: 6px;
-  background: #fafafa;
-  transition: box-shadow 0.2s ease;
+.subcategoryItem:last-child {
+  border-bottom: none;
 }
 
-.budgetItem:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.subcategoryItem:hover {
+  background-color: #f9fafb;
 }
 
-.itemHeader {
+/* Subcategory header with name and amounts */
+.subcategoryHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
-.categoryInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.category {
-  font-weight: 600;
-  font-size: 1.125rem;
-  color: #1f2937;
-}
-
-.subcategory {
-  font-size: 1.125rem;
-  color: #1f2937;
-  font-weight: 600;
+.subcategoryName {
+  font-size: 1rem;
+  color: #374151;
+  font-weight: 500;
 }
 
 .amounts {
@@ -321,17 +313,26 @@
 
 .progressContainer {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  align-items: center;
+  gap: 1rem;
 }
 
 .progressBar {
-  width: 100%;
+  flex: 1;
   height: 12px;
   background-color: #e5e7eb;
   border-radius: 6px;
   overflow: hidden;
   position: relative;
+  min-width: 0; /* Allow flex item to shrink */
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.progressBar:hover {
+  background-color: #d1d5db;
+  transform: scale(1.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .progressFill {
@@ -341,10 +342,31 @@
   position: relative;
 }
 
-.variance {
+.progressInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.currentAmount {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.budgetAmount {
   color: #6b7280;
-  text-align: right;
+}
+
+.separator {
+  color: #d1d5db;
+  font-weight: 300;
+}
+
+.variance {
+  color: #6b7280;
   font-weight: 500;
 }
 
@@ -377,7 +399,7 @@
     grid-template-columns: 1fr;
   }
   
-  .itemHeader {
+  .subcategoryHeader {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
@@ -403,6 +425,30 @@
   
   .editInput {
     width: 100px;
+  }
+  
+  .categoryHeader {
+    padding: 0.75rem 1rem;
+  }
+  
+  .subcategoryItem {
+    padding: 0.75rem 1rem;
+  }
+  
+  .progressContainer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  
+  .progressInfo {
+    justify-content: space-between;
+    font-size: 0.8rem;
+    gap: 0.5rem;
+  }
+  
+  .progressBar {
+    order: -1; /* Move progress bar above the text on mobile */
   }
 }
 

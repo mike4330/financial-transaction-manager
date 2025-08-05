@@ -306,7 +306,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                         onChange={toggleAllSelection}
                       />
                     </th>
-                    {(['date', 'payee', 'description', 'amount', 'category', 'subcategory'] as const).map(column => (
+                    {(['date', 'payee', 'amount', 'category', 'subcategory'] as const).map(column => (
                       <th 
                         key={column}
                         onClick={() => handleSort(column)}
@@ -341,11 +341,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                       <td className={`${styles.tableCell} ${styles.tableCellPayee}`}>
                         <div className={styles.ellipsis}>
                           {transaction.payee || '-'}
-                        </div>
-                      </td>
-                      <td className={`${styles.tableCell} ${styles.tableCellDescription}`}>
-                        <div className={styles.ellipsis}>
-                          {transaction.description}
                         </div>
                       </td>
                       <td className={`${styles.tableCell} ${styles.tableCellAmount} ${transaction.amount < 0 ? styles.amountNegative : styles.amountPositive}`}>

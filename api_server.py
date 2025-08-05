@@ -43,10 +43,14 @@ def get_transactions():
         category = request.args.get('category')
         subcategory = request.args.get('subcategory')
         transaction_type = request.args.get('type')
+        symbol = request.args.get('symbol')
+        exclude_investments = request.args.get('exclude_investments') == 'true'
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         uncategorized_only = request.args.get('uncategorized') == 'true'
         search = request.args.get('search')
+        sort_column = request.args.get('sort_column', 'date')
+        sort_direction = request.args.get('sort_direction', 'desc')
         
         conn = get_db_connection()
         
@@ -94,6 +98,13 @@ def get_transactions():
             query += " AND t.type = ?"
             params.append(transaction_type)
         
+        if symbol:
+            query += " AND t.symbol = ?"
+            params.append(symbol)
+        
+        if exclude_investments:
+            query += " AND t.type NOT IN ('Investment Trade', 'Dividend', 'Reinvestment', 'Dividend Taxes', 'Brokerage Fee')"
+        
         if start_date:
             # Date is already in YYYY-MM-DD format
             query += """ AND date(t.run_date) >= date(?)"""
@@ -117,12 +128,28 @@ def get_transactions():
                     OR LOWER(t.action) LIKE ? 
                     OR LOWER(c.name) LIKE ? 
                     OR LOWER(s.name) LIKE ?
+                    OR CAST(ABS(t.amount) AS TEXT) LIKE ?
                 )
             """
-            params.extend([search_term, search_term, search_term, search_term, search_term])
+            params.extend([search_term, search_term, search_term, search_term, search_term, search_term])
         
-        # Add ordering and pagination
-        query += " ORDER BY t.run_date DESC"
+        # Add dynamic ordering
+        # Map frontend column names to database column names
+        column_mapping = {
+            'date': 't.run_date',
+            'account': 't.account',
+            'amount': 't.amount',
+            'payee': 't.payee',
+            'category': 'c.name',
+            'subcategory': 's.name',
+            'transaction_type': 't.type'
+        }
+        
+        # Validate sort column and direction
+        db_column = column_mapping.get(sort_column, 't.run_date')
+        direction = 'ASC' if sort_direction.lower() == 'asc' else 'DESC'
+        
+        query += f" ORDER BY {db_column} {direction}"
         
         # Count total records for pagination
         count_query = f"SELECT COUNT(*) as total FROM ({query}) as filtered"

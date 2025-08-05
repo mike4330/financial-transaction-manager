@@ -1,0 +1,20 @@
+# PayPal Email Parser Requirements
+# Core Python libraries (included in standard library):
+# - imaplib
+# - email
+# - re
+# - csv
+# - os
+# - json
+# - datetime
+# - typing
+# - argparse
+# - getpass
+# - logging
+
+# Optional: For better HTML parsing (if needed)
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Optional: For more robust email parsing
+email-validator==2.1.0

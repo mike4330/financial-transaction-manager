@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { useTimeRange } from '../contexts/TimeRangeContext';
 import { usePreferences } from '../contexts/PreferencesContext';
@@ -57,9 +57,10 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
     const max = Math.max(...values);
     const range = max - min;
     
-    // Add 10% padding to both ends
+    // Add 10% padding to both ends, but ensure minimum doesn't go below zero
     const padding = range * 0.1;
-    return [min - padding, max + padding];
+    const paddedMin = Math.max(0, min - padding); // Floor at zero
+    return [paddedMin, max + padding];
   };
 
   // Helper function to calculate date range from clicked data point
@@ -166,19 +167,33 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
         
         // Get date filter from time range context
         const dateFilter = getDateFilter();
-        const params = new URLSearchParams({
-          category: config.category,
-          subcategory: config.subcategory,
-          limit: '1000'
-        });
         
-        if (dateFilter.startDate) {
-          params.append('start_date', dateFilter.startDate);
+        let apiUrl: string;
+        
+        if (config.endpoint) {
+          // Use custom endpoint with date filtering
+          const endpointUrl = new URL(config.endpoint, window.location.origin);
+          if (dateFilter.startDate) {
+            endpointUrl.searchParams.append('start_date', dateFilter.startDate);
+          }
+          endpointUrl.searchParams.append('limit', '1000');
+          apiUrl = endpointUrl.toString();
+        } else {
+          // Use standard category/subcategory filtering
+          const params = new URLSearchParams({
+            category: config.category,
+            subcategory: config.subcategory,
+            limit: '1000'
+          });
+          
+          if (dateFilter.startDate) {
+            params.append('start_date', dateFilter.startDate);
+          }
+          apiUrl = `/api/transactions?${params.toString()}`;
         }
-        // No end date needed - we want everything from start_date to now
         
         // Fetch filtered transactions
-        const response = await fetch(`/api/transactions?${params.toString()}`);
+        const response = await fetch(apiUrl);
         const result = await response.json();
         
         if (!response.ok) {
@@ -398,3 +413,5 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
     </div>
   );
 };
+
+export const MemoizedGenericChart = React.memo(GenericChart);
