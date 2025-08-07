@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styles from './RecurringPatterns.module.css';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceDot } from 'recharts';
 
 interface Pattern {
   id?: number;
@@ -73,7 +74,14 @@ const RecurringPatterns: React.FC = () => {
   const [balanceProjection, setBalanceProjection] = useState<BalanceProjection | null>(null);
   const [startingBalance, setStartingBalance] = useState(15000);
   const [projectionDays, setProjectionDays] = useState(90);
-  const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; data: DailyProjection } | null>(null);
+  
+  // Table sorting state
+  const [sortColumn, setSortColumn] = useState<'pattern' | 'account' | 'amount' | 'frequency' | 'confidence' | 'next_due'>('amount');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  
+  // Edit pattern state
+  const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Pattern>>({});
 
   // Load saved patterns on component mount
   useEffect(() => {
@@ -213,6 +221,94 @@ const RecurringPatterns: React.FC = () => {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to deactivate pattern');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  const sortedPatterns = [...savedPatterns].sort((a, b) => {
+    let aValue: any, bValue: any;
+    
+    switch (sortColumn) {
+      case 'pattern':
+        aValue = a.pattern_name.toLowerCase();
+        bValue = b.pattern_name.toLowerCase();
+        break;
+      case 'account':
+        aValue = a.account_number;
+        bValue = b.account_number;
+        break;
+      case 'amount':
+        aValue = a.typical_amount;
+        bValue = b.typical_amount;
+        break;
+      case 'frequency':
+        aValue = a.frequency_type;
+        bValue = b.frequency_type;
+        break;
+      case 'confidence':
+        aValue = a.confidence;
+        bValue = b.confidence;
+        break;
+      case 'next_due':
+        aValue = new Date(a.next_expected_date).getTime();
+        bValue = new Date(b.next_expected_date).getTime();
+        break;
+      default:
+        return 0;
+    }
+    
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const startEdit = (pattern: Pattern) => {
+    setEditingPattern(pattern);
+    setEditForm({
+      pattern_name: pattern.pattern_name,
+      typical_amount: pattern.typical_amount,
+      frequency_type: pattern.frequency_type,
+      next_expected_date: pattern.next_expected_date
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingPattern(null);
+    setEditForm({});
+  };
+
+  const saveEdit = async () => {
+    if (!editingPattern || !editingPattern.id) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/recurring-patterns/${editingPattern.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editForm),
+      });
+
+      if (response.ok) {
+        setEditingPattern(null);
+        setEditForm({});
+        loadSavedPatterns(); // Reload patterns
+      } else {
+        throw new Error('Failed to update pattern');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update pattern');
     } finally {
       setLoading(false);
     }
@@ -378,6 +474,15 @@ const RecurringPatterns: React.FC = () => {
                     <span className={styles.label}>Type:</span>
                     <span className={styles['pattern-type']}>{pattern.pattern_type}</span>
                   </div>
+                  {(pattern.category || pattern.subcategory) && (
+                    <div className={styles.detail}>
+                      <span className={styles.label}>Category:</span>
+                      <span>
+                        {pattern.category}
+                        {pattern.subcategory && ` / ${pattern.subcategory}`}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -396,27 +501,80 @@ const RecurringPatterns: React.FC = () => {
             <table>
               <thead>
                 <tr>
-                  <th>Pattern</th>
-                  <th>Account</th>
-                  <th>Amount</th>
-                  <th>Frequency</th>
-                  <th>Confidence</th>
-                  <th>Next Due</th>
+                  <th onClick={() => handleSort('pattern')} className={styles['sortable-header']}>
+                    Pattern {sortColumn === 'pattern' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('account')} className={styles['sortable-header']}>
+                    Account {sortColumn === 'account' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('amount')} className={styles['sortable-header']}>
+                    Amount {sortColumn === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('frequency')} className={styles['sortable-header']}>
+                    Frequency {sortColumn === 'frequency' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('confidence')} className={styles['sortable-header']}>
+                    Confidence {sortColumn === 'confidence' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('next_due')} className={styles['sortable-header']}>
+                    Next Due {sortColumn === 'next_due' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {savedPatterns.map((pattern) => (
+                {sortedPatterns.map((pattern) => (
                   <tr key={pattern.id}>
                     <td>
-                      <div className={styles['pattern-name']}>{pattern.pattern_name}</div>
-                      {pattern.payee && (
-                        <div className={styles['pattern-payee']}>{pattern.payee}</div>
+                      {editingPattern?.id === pattern.id ? (
+                        <input 
+                          type="text" 
+                          value={editForm.pattern_name || ''}
+                          onChange={(e) => setEditForm({...editForm, pattern_name: e.target.value})}
+                          className={styles['edit-input']}
+                          placeholder="Pattern name"
+                        />
+                      ) : (
+                        <>
+                          <div className={styles['pattern-name']}>{pattern.pattern_name}</div>
+                          {pattern.payee && (
+                            <div className={styles['pattern-payee']}>{pattern.payee}</div>
+                          )}
+                        </>
                       )}
                     </td>
                     <td>{pattern.account_number}</td>
-                    <td>{formatCurrency(pattern.typical_amount, pattern.amount_variance)}</td>
-                    <td>{formatFrequency(pattern.frequency_type, pattern.frequency_interval)}</td>
+                    <td>
+                      {editingPattern?.id === pattern.id ? (
+                        <input 
+                          type="number" 
+                          value={editForm.typical_amount || ''}
+                          onChange={(e) => setEditForm({...editForm, typical_amount: parseFloat(e.target.value)})}
+                          className={styles['edit-input-small']}
+                          placeholder="Amount"
+                          step="0.01"
+                        />
+                      ) : (
+                        formatCurrency(pattern.typical_amount, pattern.amount_variance)
+                      )}
+                    </td>
+                    <td>
+                      {editingPattern?.id === pattern.id ? (
+                        <select 
+                          value={editForm.frequency_type || ''}
+                          onChange={(e) => setEditForm({...editForm, frequency_type: e.target.value})}
+                          className={styles['edit-select']}
+                        >
+                          <option value="weekly">Weekly</option>
+                          <option value="biweekly">Biweekly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="quarterly">Quarterly</option>
+                          <option value="annual">Annual</option>
+                        </select>
+                      ) : (
+                        formatFrequency(pattern.frequency_type, pattern.frequency_interval)
+                      )}
+                    </td>
                     <td>
                       <div 
                         className={styles['confidence-indicator']}
@@ -425,14 +583,53 @@ const RecurringPatterns: React.FC = () => {
                         {pattern.confidence.toFixed(1)}%
                       </div>
                     </td>
-                    <td>{pattern.next_expected_date}</td>
                     <td>
-                      <button 
-                        onClick={() => pattern.id && deactivatePattern(pattern.id)}
-                        className={styles['deactivate-button']}
-                      >
-                        Deactivate
-                      </button>
+                      {editingPattern?.id === pattern.id ? (
+                        <input 
+                          type="date" 
+                          value={editForm.next_expected_date || ''}
+                          onChange={(e) => setEditForm({...editForm, next_expected_date: e.target.value})}
+                          className={styles['edit-input']}
+                        />
+                      ) : (
+                        pattern.next_expected_date
+                      )}
+                    </td>
+                    <td>
+                      <div className={styles['action-buttons']}>
+                        {editingPattern?.id === pattern.id ? (
+                          <>
+                            <button 
+                              onClick={saveEdit}
+                              className={styles['save-edit-button']}
+                              disabled={loading}
+                            >
+                              ✓
+                            </button>
+                            <button 
+                              onClick={cancelEdit}
+                              className={styles['cancel-edit-button']}
+                            >
+                              ✕
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button 
+                              onClick={() => startEdit(pattern)}
+                              className={styles['edit-button']}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => pattern.id && deactivatePattern(pattern.id)}
+                              className={styles['deactivate-button']}
+                            >
+                              Deactivate
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -522,150 +719,97 @@ const RecurringPatterns: React.FC = () => {
               <div className={styles['balance-chart']}>
                 <h3>Balance Over Time</h3>
                 <div className={styles['chart-container']}>
-                  <div style={{ position: 'relative' }}>
-                    <svg width="100%" height="300" viewBox="0 0 800 300">
-                      {(() => {
-                        // Sample daily projections more intelligently for smoother line
-                        const allData = balanceProjection.daily_projections;
-                        const data = allData.filter((_, i) => i % Math.ceil(allData.length / 50) === 0);
-                        
-                        // Get all days with transactions for markers
-                        const transactionDays = allData.filter(d => d.projected_transactions.length > 0);
-                        
-                        const minBalance = Math.min(...allData.map(d => d.balance));
-                        const maxBalance = Math.max(...allData.map(d => d.balance));
-                        const range = maxBalance - minBalance;
-                        const padding = range * 0.1;
-                        
-                        const getY = (balance: number) => 280 - ((balance - minBalance + padding) / (range + 2 * padding)) * 260;
-                        const getX = (dayIndex: number) => (dayIndex / (allData.length - 1)) * 750 + 25;
-                        
-                        const pathD = data
-                          .map((d, i) => {
-                            const dayIndex = allData.findIndex(day => day.date === d.date);
-                            return `${i === 0 ? 'M' : 'L'} ${getX(dayIndex)} ${getY(d.balance)}`;
-                          })
-                          .join(' ');
-                        
-                        return (
-                          <>
-                            {/* Grid lines */}
-                            {[0, 0.25, 0.5, 0.75, 1].map(ratio => {
-                              const y = 280 - ratio * 260;
-                              const balance = minBalance - padding + ratio * (range + 2 * padding);
-                              return (
-                                <g key={ratio}>
-                                  <line x1="25" y1={y} x2="775" y2={y} stroke="#e5e7eb" strokeWidth="1" />
-                                  <text x="10" y={y + 4} fontSize="12" fill="#6b7280">
-                                    ${Math.round(balance).toLocaleString()}
-                                  </text>
-                                </g>
-                              );
-                            })}
-                            
-                            {/* Balance line */}
-                            <path 
-                              d={pathD} 
-                              fill="none" 
-                              stroke="#3b82f6" 
-                              strokeWidth="2"
-                            />
-                            
-                            {/* Transaction markers - only show on days with transactions */}
-                            {transactionDays.map((day, i) => {
-                              const dayIndex = allData.findIndex(d => d.date === day.date);
-                              const x = getX(dayIndex);
-                              const y = getY(day.balance);
-                              
-                              // Determine marker color based on net transaction amount
-                              const netAmount = day.projected_transactions.reduce((sum, tx) => sum + tx.amount, 0);
-                              const isIncome = netAmount > 0;
-                              const markerColor = isIncome ? '#10b981' : '#ef4444';
-                              
-                              return (
-                                <g key={`${day.date}-${i}`}>
-                                  {/* Transaction marker */}
-                                  <circle
-                                    cx={x}
-                                    cy={y}
-                                    r="4"
-                                    fill={markerColor}
-                                    stroke="white"
-                                    strokeWidth="2"
-                                    style={{ cursor: 'pointer' }}
-                                    onMouseEnter={(e) => {
-                                      const rect = e.currentTarget.closest('svg')?.getBoundingClientRect();
-                                      if (rect) {
-                                        setHoveredPoint({
-                                          x: rect.left + x * (rect.width / 800),
-                                          y: rect.top + y * (rect.height / 300),
-                                          data: day
-                                        });
-                                      }
-                                    }}
-                                    onMouseLeave={() => setHoveredPoint(null)}
-                                  />
-                                  
-                                  {/* Small indicator ring for emphasis */}
-                                  <circle
-                                    cx={x}
-                                    cy={y}
-                                    r="6"
-                                    fill="none"
-                                    stroke={markerColor}
-                                    strokeWidth="1"
-                                    opacity="0.3"
-                                  />
-                                </g>
-                              );
-                            })}
-                          </>
-                        );
-                      })()}
-                    </svg>
-                    
-                    {/* Tooltip */}
-                    {hoveredPoint && (
-                      <div 
-                        className={styles['chart-tooltip']}
-                        style={{
-                          position: 'absolute',
-                          left: hoveredPoint.x + 10,
-                          top: hoveredPoint.y - 10,
-                          pointerEvents: 'none',
-                          zIndex: 1000
-                        }}
-                      >
-                        <div className={styles['tooltip-content']}>
-                          <div className={styles['tooltip-date']}>
-                            {new Date(hoveredPoint.data.date).toLocaleDateString('en-US', { 
-                              weekday: 'short', 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}
-                          </div>
-                          <div className={styles['tooltip-balance']}>
-                            Balance: ${hoveredPoint.data.balance.toLocaleString()}
-                          </div>
-                          {hoveredPoint.data.daily_change !== 0 && (
-                            <div className={`${styles['tooltip-change']} ${hoveredPoint.data.daily_change >= 0 ? styles.positive : styles.negative}`}>
-                              {hoveredPoint.data.daily_change >= 0 ? '+' : ''}${hoveredPoint.data.daily_change.toFixed(2)}
-                            </div>
-                          )}
-                          <div className={styles['tooltip-transactions']}>
-                            {hoveredPoint.data.projected_transactions.map((tx, i) => (
-                              <div key={i} className={styles['tooltip-transaction']}>
-                                <span className={styles['tooltip-transaction-name']}>{tx.pattern_name}</span>
-                                <span className={`${styles['tooltip-transaction-amount']} ${tx.amount >= 0 ? styles.positive : styles.negative}`}>
-                                  {tx.amount >= 0 ? '+' : ''}${Math.abs(tx.amount).toFixed(2)}
-                                </span>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart
+                      data={balanceProjection.daily_projections.filter((_, i) => i % Math.max(1, Math.ceil(balanceProjection.daily_projections.length / 100)) === 0)}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis 
+                        dataKey="date" 
+                        tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        stroke="#6b7280"
+                        fontSize={12}
+                      />
+                      <YAxis 
+                        tickFormatter={(value) => `$${value.toLocaleString()}`}
+                        stroke="#6b7280"
+                        fontSize={12}
+                      />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload as DailyProjection;
+                            return (
+                              <div className={styles['recharts-tooltip']}>
+                                <div className={styles['tooltip-content']}>
+                                  <div className={styles['tooltip-date']}>
+                                    {new Date(label).toLocaleDateString('en-US', { 
+                                      weekday: 'short', 
+                                      month: 'short', 
+                                      day: 'numeric' 
+                                    })}
+                                  </div>
+                                  <div className={styles['tooltip-balance']}>
+                                    Balance: ${data.balance.toLocaleString()}
+                                  </div>
+                                  {data.daily_change !== 0 && (
+                                    <div className={`${styles['tooltip-change']} ${data.daily_change >= 0 ? styles.positive : styles.negative}`}>
+                                      {data.daily_change >= 0 ? '+' : ''}${data.daily_change.toFixed(2)}
+                                    </div>
+                                  )}
+                                  {data.projected_transactions.length > 0 && (
+                                    <div className={styles['tooltip-transactions']}>
+                                      {data.projected_transactions.map((tx, i) => (
+                                        <div key={i} className={styles['tooltip-transaction']}>
+                                          <span className={styles['tooltip-transaction-name']}>{tx.pattern_name}</span>
+                                          <span className={`${styles['tooltip-transaction-amount']} ${tx.amount >= 0 ? styles.positive : styles.negative}`}>
+                                            {tx.amount >= 0 ? '+' : ''}${Math.abs(tx.amount).toFixed(2)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="balance" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: 'white' }}
+                      />
+                      
+                      {/* Add dots for days with transactions */}
+                      {balanceProjection.daily_projections
+                        .filter(d => d.projected_transactions.length > 0)
+                        .filter((_, i) => i % Math.max(1, Math.ceil(balanceProjection.daily_projections.filter(d => d.projected_transactions.length > 0).length / 50)) === 0)
+                        .map((day, i) => {
+                          const netAmount = day.projected_transactions.reduce((sum, tx) => sum + tx.amount, 0);
+                          const isIncome = netAmount > 0;
+                          const markerColor = isIncome ? '#10b981' : '#ef4444';
+                          
+                          return (
+                            <ReferenceDot
+                              key={`${day.date}-${i}`}
+                              x={day.date}
+                              y={day.balance}
+                              r={4}
+                              fill={markerColor}
+                              stroke="white"
+                              strokeWidth={2}
+                            />
+                          );
+                        })
+                      }
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
 

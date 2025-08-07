@@ -1891,11 +1891,34 @@ class TransactionDB:
         import statistics
         
         conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
         try:
             # Calculate cutoff date
             cutoff_date = (datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+            
+            # Get existing saved patterns to avoid duplicates
+            existing_patterns_query = '''
+                SELECT DISTINCT payee, account_number, typical_amount, frequency_type
+                FROM recurring_patterns 
+                WHERE is_active = 1
+            '''
+            if account_number:
+                existing_patterns_query += ' AND account_number = ?'
+                existing_patterns = cursor.execute(existing_patterns_query, (account_number,)).fetchall()
+            else:
+                existing_patterns = cursor.execute(existing_patterns_query).fetchall()
+            
+            # Create a set of existing pattern keys for quick lookup
+            existing_pattern_keys = set()
+            for pattern in existing_patterns:
+                # Create a key based on payee, account, and approximate amount (within $1)
+                payee_key = pattern['payee'].lower().strip() if pattern['payee'] else ''
+                account_key = pattern['account_number']
+                amount_key = round(float(pattern['typical_amount']), 0)  # Round to nearest dollar
+                freq_key = pattern['frequency_type']
+                existing_pattern_keys.add((payee_key, account_key, amount_key, freq_key))
             
             # Get transactions for analysis
             where_clause = "WHERE run_date >= ?"
@@ -1936,13 +1959,29 @@ class TransactionDB:
                                                      exact_patterns + fuzzy_patterns)
             detected_patterns.extend(date_patterns)
             
-            return detected_patterns
+            # Filter out patterns that already exist
+            filtered_patterns = []
+            for pattern in detected_patterns:
+                if not self._pattern_already_exists(pattern, existing_pattern_keys):
+                    filtered_patterns.append(pattern)
+            
+            return filtered_patterns
             
         except Exception as e:
             print(f"Error detecting recurring patterns: {e}")
             return []
         finally:
             conn.close()
+    
+    def _pattern_already_exists(self, pattern: Dict, existing_keys: set) -> bool:
+        """Check if a detected pattern already exists in saved patterns"""
+        payee_key = pattern['payee'].lower().strip() if pattern['payee'] else ''
+        account_key = pattern['account_number']
+        amount_key = round(float(pattern['typical_amount']), 0)  # Round to nearest dollar
+        freq_key = pattern['frequency_type']
+        
+        pattern_key = (payee_key, account_key, amount_key, freq_key)
+        return pattern_key in existing_keys
     
     def _detect_exact_amount_patterns(self, transactions: List, min_occurrences: int) -> List[Dict]:
         """Pass 1: Detect patterns with exact amount matches"""
@@ -1993,6 +2032,11 @@ class TransactionDB:
             # Calculate next expected date
             last_date = max(dates)
             next_expected = last_date + timedelta(days=int(avg_interval))
+            
+            # Ensure next expected date is in the future
+            today = datetime.now().date()
+            while next_expected.date() <= today:
+                next_expected = next_expected + timedelta(days=int(avg_interval))
             
             pattern = {
                 'pattern_name': f"{payee} - ${abs(amount):.2f} ({frequency_type})",
@@ -2086,6 +2130,11 @@ class TransactionDB:
             
             last_date = max(dates)
             next_expected = last_date + timedelta(days=int(avg_interval))
+            
+            # Ensure next expected date is in the future
+            today = datetime.now().date()
+            while next_expected.date() <= today:
+                next_expected = next_expected + timedelta(days=int(avg_interval))
             
             pattern = {
                 'pattern_name': f"{occurrences[0]['payee']} - ~${avg_amount:.2f} ({frequency_type})",
@@ -2191,6 +2240,17 @@ class TransactionDB:
             except ValueError:
                 # Handle end-of-month edge cases
                 next_expected = next_month + timedelta(days=27)
+            
+            # Ensure next expected date is in the future
+            today = datetime.now().date()
+            while next_expected.date() <= today:
+                # Move to same day next month
+                try:
+                    next_month = next_expected.replace(day=1) + timedelta(days=32)
+                    next_month = next_month.replace(day=1)
+                    next_expected = next_month.replace(day=int(statistics.mean(actual_days)))
+                except ValueError:
+                    next_expected = next_expected + timedelta(days=30)  # Fallback
             
             pattern = {
                 'pattern_name': f"{occurrences[0]['payee']} - Day {int(statistics.mean(actual_days))} (monthly)",
@@ -2344,24 +2404,54 @@ class TransactionDB:
         finally:
             conn.close()
     
-    def deactivate_pattern(self, pattern_id: int) -> bool:
-        """Deactivate a recurring pattern"""
+    def update_pattern(self, pattern_id: int, updates: Dict) -> bool:
+        """Update multiple fields of a recurring pattern"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         try:
-            cursor.execute('''
-                UPDATE recurring_patterns 
-                SET is_active = 0, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (pattern_id,))
+            # Build dynamic update query
+            allowed_fields = {
+                'pattern_name', 'typical_amount', 'amount_variance', 
+                'frequency_type', 'frequency_interval', 'next_expected_date',
+                'is_active', 'confidence'
+            }
             
+            # Filter to only allowed fields
+            filtered_updates = {k: v for k, v in updates.items() if k in allowed_fields}
+            
+            if not filtered_updates:
+                return False
+                
+            # Build SET clause
+            set_clauses = []
+            values = []
+            
+            for field, value in filtered_updates.items():
+                set_clauses.append(f"{field} = ?")
+                values.append(value)
+            
+            # Always update the timestamp
+            set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+            values.append(pattern_id)
+            
+            query = f'''
+                UPDATE recurring_patterns 
+                SET {', '.join(set_clauses)}
+                WHERE id = ?
+            '''
+            
+            cursor.execute(query, values)
             success = cursor.rowcount > 0
             conn.commit()
             return success
             
         except Exception as e:
-            print(f"Error deactivating pattern: {e}")
+            print(f"Error updating pattern: {e}")
             return False
         finally:
             conn.close()
+
+    def deactivate_pattern(self, pattern_id: int) -> bool:
+        """Deactivate a recurring pattern"""
+        return self.update_pattern(pattern_id, {'is_active': 0})
