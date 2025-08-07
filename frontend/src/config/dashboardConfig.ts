@@ -13,7 +13,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 1, col: 1, width: 1, height: 1 },
       config: { 
         chartType: 'line', 
-        color: '#2563eb',
+        color: 'rgba(37, 99, 235, 0.8)',
         showTotal: true,
         showAverage: true,
         currency: true
@@ -30,7 +30,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 1, col: 2, width: 1, height: 1 },
       config: { 
         chartType: 'bar', 
-        color: '#dc2626',
+        color: 'rgba(220, 38, 38, 0.8)',
         showTotal: true,
         showAverage: true,
         currency: true
@@ -47,7 +47,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 2, col: 1, width: 1, height: 1 },
       config: { 
         chartType: 'line', 
-        color: '#10b981',
+        color: 'rgba(16, 185, 129, 0.8)',
         showTotal: true,
         showAverage: true,
         currency: true
@@ -65,7 +65,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 2, col: 2, width: 1, height: 1 },
       config: { 
         chartType: 'bar', 
-        color: '#f59e0b',
+        color: 'rgba(245, 158, 11, 0.8)',
         showTotal: true,
         showAverage: true,
         currency: true
@@ -83,7 +83,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 3, col: 1, width: 1, height: 1 },
       config: { 
         chartType: 'bar', 
-        color: '#8b5cf6',
+        color: 'rgba(139, 92, 246, 0.8)',
         showTotal: false,
         showAverage: true,
         percentage: true
@@ -101,7 +101,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 3, col: 2, width: 1, height: 1 },
       config: { 
         chartType: 'bar', 
-        color: '#ef4444',
+        color: 'rgba(239, 68, 68, 0.8)',
         showTotal: false,
         showAverage: true,
         percentage: true
@@ -117,7 +117,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 4, col: 1, width: 1, height: 1 },
       config: { 
         chartType: 'line', 
-        color: '#06b6d4',
+        color: 'rgba(6, 182, 212, 0.8)',
         showTotal: true,
         showAverage: true,
         currency: true
@@ -136,7 +136,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 4, col: 2, width: 1, height: 1 },
       config: { 
         chartType: 'bar', 
-        color: '#84cc16',
+        color: 'rgba(132, 204, 22, 0.8)',
         showTotal: false,
         showAverage: true,
         percentage: true
@@ -153,7 +153,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 5, col: 1, width: 1, height: 1 },
       config: { 
         chartType: 'bar', 
-        color: '#a855f7',
+        color: 'rgba(168, 85, 247, 0.8)',
         showTotal: true,
         showAverage: true,
         currency: true
@@ -171,7 +171,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 5, col: 2, width: 1, height: 1 },
       config: { 
         chartType: 'line', 
-        color: '#16a34a',
+        color: 'rgba(22, 163, 74, 0.8)',
         showTotal: true,
         showAverage: true,
         currency: true
@@ -187,7 +187,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 6, col: 1, width: 2, height: 1 },
       config: { 
         chartType: 'bar', 
-        color: '#ec4899',
+        color: 'rgba(236, 72, 153, 0.8)',
         showTotal: true,
         showAverage: false,
         currency: true,
@@ -204,7 +204,7 @@ export const defaultDashboardConfig: DashboardConfig = {
       layout: { row: 7, col: 1, width: 2, height: 1 },
       config: { 
         chartType: 'bar', 
-        color: '#8b5cf6',
+        color: 'rgba(139, 92, 246, 0.8)',
         showTotal: true,
         showAverage: false,
         currency: true,

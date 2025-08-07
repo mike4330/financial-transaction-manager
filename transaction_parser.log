@@ -30905,3 +30905,223 @@
 2025-08-05 06:47:14,681 - __main__ - INFO - Database initialized: transactions.db
 2025-08-05 07:00:43,998 - __main__ - INFO - Starting Financial Transaction Parser
 2025-08-05 07:00:43,999 - __main__ - INFO - Database initialized: transactions.db
+2025-08-05 19:28:35,143 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-05 19:28:35,145 - __main__ - INFO - Database initialized: transactions.db
+2025-08-05 19:28:35,145 - __main__ - INFO - Starting file monitor for directory: ./transactions
+2025-08-05 19:28:35,145 - file_monitor - INFO - Processing existing CSV files...
+2025-08-05 19:28:35,145 - csv_parser - INFO - No CSV files found in ./transactions
+2025-08-05 19:28:35,145 - file_monitor - INFO - Processed 0 files: 0 new transactions, 0 duplicates, 0 errors
+2025-08-05 19:28:35,177 - file_monitor - INFO - Started monitoring ./transactions for CSV files
+2025-08-05 19:30:51,517 - file_monitor - INFO - New CSV file detected: ./transactions/History_for_Account_Z06431462.csv
+2025-08-05 19:30:53,520 - csv_parser - INFO - Processing file: History_for_Account_Z06431462.csv
+2025-08-05 19:30:53,554 - csv_parser - INFO - Auto-classified transaction as Transportation/Rideshare (confidence: 1.00)
+2025-08-05 19:30:53,559 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,562 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,565 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,568 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,571 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,575 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,578 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,581 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,583 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,586 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 1.00)
+2025-08-05 19:30:53,589 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,592 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,595 - csv_parser - INFO - Auto-classified transaction as Healthcare/Medical (confidence: 0.85)
+2025-08-05 19:30:53,601 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,605 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,608 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,611 - csv_parser - INFO - Auto-classified transaction as Entertainment/Streaming (confidence: 0.95)
+2025-08-05 19:30:53,614 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,618 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,620 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.90)
+2025-08-05 19:30:53,625 - csv_parser - INFO - Auto-classified transaction as Transportation/Car Payment (confidence: 0.80)
+2025-08-05 19:30:53,628 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,631 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.90)
+2025-08-05 19:30:53,633 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,636 - csv_parser - INFO - Auto-classified transaction as Transportation/Rideshare (confidence: 1.00)
+2025-08-05 19:30:53,639 - csv_parser - INFO - Auto-classified transaction as Entertainment/Streaming (confidence: 0.95)
+2025-08-05 19:30:53,642 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,644 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,647 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 1.00)
+2025-08-05 19:30:53,649 - csv_parser - INFO - Auto-classified transaction as Transportation/Rideshare (confidence: 1.00)
+2025-08-05 19:30:53,652 - csv_parser - INFO - Auto-classified transaction as Investment/Stock Purchase (confidence: 0.90)
+2025-08-05 19:30:53,656 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,660 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,663 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,666 - csv_parser - INFO - Auto-classified transaction as Transportation/Gas (confidence: 1.00)
+2025-08-05 19:30:53,669 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,672 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,674 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,677 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,680 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,682 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,685 - csv_parser - INFO - Auto-classified transaction as Entertainment/Online Services (confidence: 1.00)
+2025-08-05 19:30:53,688 - csv_parser - INFO - Auto-classified transaction as Entertainment/Streaming (confidence: 0.90)
+2025-08-05 19:30:53,691 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,694 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,696 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,699 - csv_parser - INFO - Auto-classified transaction as Entertainment/Streaming (confidence: 0.90)
+2025-08-05 19:30:53,701 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,704 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,707 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,710 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,713 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,716 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,719 - csv_parser - INFO - Auto-classified transaction as Entertainment/Streaming (confidence: 0.90)
+2025-08-05 19:30:53,722 - csv_parser - INFO - Auto-classified transaction as Transportation/Car Payment (confidence: 0.80)
+2025-08-05 19:30:53,725 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,727 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,730 - csv_parser - INFO - Auto-classified transaction as Investment/Stock Purchase (confidence: 0.90)
+2025-08-05 19:30:53,733 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,735 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,738 - csv_parser - INFO - Auto-classified transaction as Investment/ETF (confidence: 0.90)
+2025-08-05 19:30:53,741 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,743 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,746 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.90)
+2025-08-05 19:30:53,748 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,751 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,754 - csv_parser - INFO - Auto-classified transaction as Entertainment/Streaming (confidence: 0.95)
+2025-08-05 19:30:53,757 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,760 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 1.00)
+2025-08-05 19:30:53,763 - csv_parser - INFO - Auto-classified transaction as Utilities/Electric (confidence: 0.80)
+2025-08-05 19:30:53,767 - csv_parser - INFO - Auto-classified transaction as Utilities/Electric (confidence: 0.80)
+2025-08-05 19:30:53,770 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,773 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,776 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,778 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,781 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:30:53,783 - csv_parser - INFO - Auto-classified transaction as Transportation/Rideshare (confidence: 1.00)
+2025-08-05 19:30:53,786 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:30:53,788 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,791 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:30:53,792 - csv_parser - WARNING - Could not parse date: The data and information in this spreadsheet is provided to you solely for your use and is not for distribution. The spreadsheet is provided for
+2025-08-05 19:30:53,792 - csv_parser - WARNING - Skipping row 100 in ./transactions/History_for_Account_Z06431462.csv: missing required fields
+2025-08-05 19:30:53,792 - csv_parser - WARNING - Could not parse date: informational purposes only, and is not intended to provide advice, nor should it be construed as an offer to sell, a solicitation of an offer to buy or a
+2025-08-05 19:30:53,792 - csv_parser - WARNING - Skipping row 101 in ./transactions/History_for_Account_Z06431462.csv: missing required fields
+2025-08-05 19:30:53,792 - csv_parser - WARNING - Could not parse date: recommendation for any security or insurance product by Fidelity or any third party. Data and information shown is based on information known to Fidelity as of the date it was
+2025-08-05 19:30:53,792 - csv_parser - WARNING - Skipping row 102 in ./transactions/History_for_Account_Z06431462.csv: missing required fields
+2025-08-05 19:30:53,792 - csv_parser - WARNING - Could not parse date: exported and is subject to change. It should not be used in place of your account statements or trade confirmations and is not intended for tax reporting
+2025-08-05 19:30:53,792 - csv_parser - WARNING - Skipping row 103 in ./transactions/History_for_Account_Z06431462.csv: missing required fields
+2025-08-05 19:30:53,792 - csv_parser - WARNING - Could not parse date: purposes. For more information on the data included in this spreadsheet, including any limitations thereof, go to Fidelity.com.
+2025-08-05 19:30:53,793 - csv_parser - WARNING - Skipping row 104 in ./transactions/History_for_Account_Z06431462.csv: missing required fields
+2025-08-05 19:30:53,793 - csv_parser - WARNING - Could not parse date: Brokerage services are provided by Fidelity Brokerage Services LLC (FBS), 900 Salem Street, Smithfield, RI 02917. Custody and other services provided by National
+2025-08-05 19:30:53,793 - csv_parser - WARNING - Skipping row 105 in ./transactions/History_for_Account_Z06431462.csv: missing required fields
+2025-08-05 19:30:53,793 - csv_parser - WARNING - Could not parse date: Financial Services LLC (NFS). Both are Fidelity Investment companies and members SIPC, NYSE. Insurance products at Fidelity are distributed by
+2025-08-05 19:30:53,793 - csv_parser - WARNING - Skipping row 106 in ./transactions/History_for_Account_Z06431462.csv: missing required fields
+2025-08-05 19:30:53,793 - csv_parser - WARNING - Could not parse date: Fidelity Insurance Agency, Inc., and, for certain products, by Fidelity Brokerage Services, Member NYSE, SIPC.
+2025-08-05 19:30:53,793 - csv_parser - WARNING - Skipping row 107 in ./transactions/History_for_Account_Z06431462.csv: missing required fields
+2025-08-05 19:30:53,793 - csv_parser - WARNING - Could not parse date: Date downloaded 08/05/2025 7:30 pm
+2025-08-05 19:30:53,793 - csv_parser - WARNING - Skipping row 108 in ./transactions/History_for_Account_Z06431462.csv: missing required fields
+2025-08-05 19:30:53,859 - csv_parser - INFO - Completed History_for_Account_Z06431462.csv: 15 new, 82 duplicates
+2025-08-05 19:30:53,859 - file_monitor - INFO - Auto-processed History_for_Account_Z06431462.csv: {'processed': 15, 'duplicates': 82, 'errors': 0}
+2025-08-05 19:30:53,859 - csv_parser - INFO - Moved History_for_Account_Z06431462.csv to processed/
+2025-08-05 19:30:53,892 - file_monitor - INFO - CSV file modified: ./transactions/History_for_Account_Z06431462.csv
+2025-08-05 19:30:55,894 - file_monitor - WARNING - File no longer exists: ./transactions/History_for_Account_Z06431462.csv
+2025-08-05 19:30:55,895 - file_monitor - INFO - CSV file modified: ./transactions/History_for_Account_Z06431462.csv
+2025-08-05 19:30:57,895 - file_monitor - WARNING - File no longer exists: ./transactions/History_for_Account_Z06431462.csv
+2025-08-05 19:30:57,896 - file_monitor - INFO - CSV file modified: ./transactions/History_for_Account_Z06431462.csv
+2025-08-05 19:30:59,898 - file_monitor - WARNING - File no longer exists: ./transactions/History_for_Account_Z06431462.csv
+2025-08-05 19:31:23,049 - file_monitor - INFO - New CSV file detected: ./transactions/History_for_Account_Z23693697.csv
+2025-08-05 19:31:25,052 - csv_parser - INFO - Processing file: History_for_Account_Z23693697.csv
+2025-08-05 19:31:25,055 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Groceries (confidence: 1.00)
+2025-08-05 19:31:25,058 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 1.00)
+2025-08-05 19:31:25,065 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:31:25,068 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.90)
+2025-08-05 19:31:25,073 - csv_parser - INFO - Auto-classified transaction as Transportation/Public Transit (confidence: 0.80)
+2025-08-05 19:31:25,077 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.90)
+2025-08-05 19:31:25,079 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:31:25,083 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:31:25,086 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:31:25,089 - csv_parser - INFO - Auto-classified transaction as Transportation/Gas (confidence: 0.90)
+2025-08-05 19:31:25,092 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:31:25,095 - csv_parser - INFO - Auto-classified transaction as Healthcare/Medical (confidence: 0.85)
+2025-08-05 19:31:25,097 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Groceries (confidence: 0.90)
+2025-08-05 19:31:25,100 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Groceries (confidence: 1.00)
+2025-08-05 19:31:25,102 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:31:25,105 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:31:25,113 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.98)
+2025-08-05 19:31:25,118 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.98)
+2025-08-05 19:31:25,123 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Groceries (confidence: 0.90)
+2025-08-05 19:31:25,127 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.95)
+2025-08-05 19:31:25,130 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Groceries (confidence: 0.85)
+2025-08-05 19:31:25,134 - csv_parser - INFO - Auto-classified transaction as Banking/Fees (confidence: 1.00)
+2025-08-05 19:31:25,136 - csv_parser - INFO - Auto-classified transaction as Transportation/Rideshare (confidence: 1.00)
+2025-08-05 19:31:25,139 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.90)
+2025-08-05 19:31:25,142 - csv_parser - INFO - Auto-classified transaction as Transportation/Rideshare (confidence: 1.00)
+2025-08-05 19:31:25,145 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.85)
+2025-08-05 19:31:25,148 - csv_parser - INFO - Auto-classified transaction as Transportation/Gas (confidence: 0.90)
+2025-08-05 19:31:25,151 - csv_parser - INFO - Auto-classified transaction as Transportation/Gas (confidence: 0.90)
+2025-08-05 19:31:25,153 - csv_parser - INFO - Auto-classified transaction as Healthcare/Medical (confidence: 0.85)
+2025-08-05 19:31:25,157 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Groceries (confidence: 1.00)
+2025-08-05 19:31:25,159 - csv_parser - INFO - Auto-classified transaction as Banking/Fees (confidence: 1.00)
+2025-08-05 19:31:25,162 - csv_parser - INFO - Auto-classified transaction as Entertainment/Music (confidence: 0.90)
+2025-08-05 19:31:25,165 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 0.95)
+2025-08-05 19:31:25,167 - csv_parser - INFO - Auto-classified transaction as Shopping/Online (confidence: 1.00)
+2025-08-05 19:31:25,170 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.90)
+2025-08-05 19:31:25,174 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.98)
+2025-08-05 19:31:25,177 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Fast Food (confidence: 0.90)
+2025-08-05 19:31:25,180 - csv_parser - INFO - Auto-classified transaction as Utilities/Electric (confidence: 1.00)
+2025-08-05 19:31:25,182 - csv_parser - INFO - Auto-classified transaction as Food & Dining/Groceries (confidence: 0.90)
+2025-08-05 19:31:25,184 - csv_parser - INFO - Auto-classified transaction as Banking/Fees (confidence: 1.00)
+2025-08-05 19:31:25,184 - csv_parser - WARNING - Could not parse date: The data and information in this spreadsheet is provided to you solely for your use and is not for distribution. The spreadsheet is provided for
+2025-08-05 19:31:25,184 - csv_parser - WARNING - Skipping row 57 in ./transactions/History_for_Account_Z23693697.csv: missing required fields
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Could not parse date: informational purposes only, and is not intended to provide advice, nor should it be construed as an offer to sell, a solicitation of an offer to buy or a
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Skipping row 58 in ./transactions/History_for_Account_Z23693697.csv: missing required fields
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Could not parse date: recommendation for any security or insurance product by Fidelity or any third party. Data and information shown is based on information known to Fidelity as of the date it was
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Skipping row 59 in ./transactions/History_for_Account_Z23693697.csv: missing required fields
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Could not parse date: exported and is subject to change. It should not be used in place of your account statements or trade confirmations and is not intended for tax reporting
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Skipping row 60 in ./transactions/History_for_Account_Z23693697.csv: missing required fields
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Could not parse date: purposes. For more information on the data included in this spreadsheet, including any limitations thereof, go to Fidelity.com.
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Skipping row 61 in ./transactions/History_for_Account_Z23693697.csv: missing required fields
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Could not parse date: Brokerage services are provided by Fidelity Brokerage Services LLC (FBS), 900 Salem Street, Smithfield, RI 02917. Custody and other services provided by National
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Skipping row 62 in ./transactions/History_for_Account_Z23693697.csv: missing required fields
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Could not parse date: Financial Services LLC (NFS). Both are Fidelity Investment companies and members SIPC, NYSE. Insurance products at Fidelity are distributed by
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Skipping row 63 in ./transactions/History_for_Account_Z23693697.csv: missing required fields
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Could not parse date: Fidelity Insurance Agency, Inc., and, for certain products, by Fidelity Brokerage Services, Member NYSE, SIPC.
+2025-08-05 19:31:25,185 - csv_parser - WARNING - Skipping row 64 in ./transactions/History_for_Account_Z23693697.csv: missing required fields
+2025-08-05 19:31:25,186 - csv_parser - WARNING - Could not parse date: Date downloaded 08/05/2025 7:31 pm
+2025-08-05 19:31:25,186 - csv_parser - WARNING - Skipping row 65 in ./transactions/History_for_Account_Z23693697.csv: missing required fields
+2025-08-05 19:31:25,230 - csv_parser - INFO - Completed History_for_Account_Z23693697.csv: 12 new, 42 duplicates
+2025-08-05 19:31:25,230 - file_monitor - INFO - Auto-processed History_for_Account_Z23693697.csv: {'processed': 12, 'duplicates': 42, 'errors': 0}
+2025-08-05 19:31:25,230 - csv_parser - INFO - Moved History_for_Account_Z23693697.csv to processed/
+2025-08-05 19:31:25,262 - file_monitor - INFO - CSV file modified: ./transactions/History_for_Account_Z23693697.csv
+2025-08-05 19:31:27,263 - file_monitor - WARNING - File no longer exists: ./transactions/History_for_Account_Z23693697.csv
+2025-08-05 19:31:27,263 - file_monitor - INFO - CSV file modified: ./transactions/History_for_Account_Z23693697.csv
+2025-08-05 19:31:29,265 - file_monitor - WARNING - File no longer exists: ./transactions/History_for_Account_Z23693697.csv
+2025-08-05 19:31:29,265 - file_monitor - INFO - CSV file modified: ./transactions/History_for_Account_Z23693697.csv
+2025-08-05 19:31:31,267 - file_monitor - WARNING - File no longer exists: ./transactions/History_for_Account_Z23693697.csv
+2025-08-05 19:36:31,497 - file_monitor - INFO - Stopped file monitoring
+2025-08-05 19:36:31,497 - __main__ - INFO - Financial Transaction Parser completed
+2025-08-06 06:41:09,682 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 06:41:09,684 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 06:42:19,980 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 06:42:19,981 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 06:54:34,122 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 06:54:34,123 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 06:56:58,728 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 06:56:58,730 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 07:03:57,992 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 07:03:57,994 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 07:30:25,281 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 07:30:25,282 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 20:44:47,533 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 20:44:47,544 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 20:44:47,585 - __main__ - INFO - Financial Transaction Parser completed
+2025-08-06 20:44:56,557 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 20:44:56,559 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 20:44:56,683 - __main__ - INFO - Financial Transaction Parser completed
+2025-08-06 20:44:59,934 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 20:44:59,936 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 20:44:59,936 - __main__ - INFO - Financial Transaction Parser completed
+2025-08-06 20:45:10,292 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 20:45:10,293 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 20:45:10,293 - __main__ - INFO - Financial Transaction Parser completed
+2025-08-06 20:45:18,924 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 20:45:18,926 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 20:45:18,927 - __main__ - INFO - Financial Transaction Parser completed
+2025-08-06 21:32:54,499 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 21:32:54,501 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 21:32:58,662 - __main__ - INFO - Starting Financial Transaction Parser
+2025-08-06 21:32:58,664 - __main__ - INFO - Database initialized: transactions.db
+2025-08-06 21:32:58,665 - __main__ - INFO - Financial Transaction Parser completed

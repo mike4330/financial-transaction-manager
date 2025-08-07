@@ -485,14 +485,12 @@ const Budget: React.FC = () => {
             <h3>Income</h3>
             <div className={styles.summaryAmount}>
               <span className={styles.actualAmount}>${totalActualIncome.toLocaleString()}</span>
-              <span className={styles.budgetedAmount}>/ ${totalBudgetedIncome.toLocaleString()}</span>
             </div>
           </div>
           <div className={styles.summaryCard}>
             <h3>Expenses</h3>
             <div className={styles.summaryAmount}>
               <span className={styles.actualAmount}>${totalActualExpenses.toLocaleString()}</span>
-              <span className={styles.budgetedAmount}>/ ${totalBudgetedExpenses.toLocaleString()}</span>
             </div>
           </div>
           <div className={styles.summaryCard}>

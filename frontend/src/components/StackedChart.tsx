@@ -36,11 +36,27 @@ interface ChartData {
 const generateSubcategoryColors = (subcategories: string[], baseColor: string = '#ec4899') => {
   const colors: { [key: string]: string } = {};
   
-  // Convert hex to HSL for color variations
-  const hexToHsl = (hex: string) => {
-    const r = parseInt(hex.slice(1, 3), 16) / 255;
-    const g = parseInt(hex.slice(3, 5), 16) / 255;
-    const b = parseInt(hex.slice(5, 7), 16) / 255;
+  // Convert color (hex or rgba) to HSL for color variations
+  const colorToHsl = (color: string) => {
+    let r, g, b;
+    
+    if (color.startsWith('rgba')) {
+      // Parse rgba(r, g, b, a) format
+      const match = color.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/);
+      if (match) {
+        r = parseInt(match[1]) / 255;
+        g = parseInt(match[2]) / 255;
+        b = parseInt(match[3]) / 255;
+      } else {
+        // Fallback to default pink color
+        r = 236 / 255; g = 72 / 255; b = 153 / 255;
+      }
+    } else {
+      // Parse hex format
+      r = parseInt(color.slice(1, 3), 16) / 255;
+      g = parseInt(color.slice(3, 5), 16) / 255;
+      b = parseInt(color.slice(5, 7), 16) / 255;
+    }
     
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
@@ -63,7 +79,7 @@ const generateSubcategoryColors = (subcategories: string[], baseColor: string = 
     return [h * 360, s * 100, l * 100];
   };
   
-  const [baseH, baseS, baseL] = hexToHsl(baseColor);
+  const [baseH, baseS, baseL] = colorToHsl(baseColor);
   
   subcategories.forEach((sub, index) => {
     // Vary lightness and slightly adjust hue for each subcategory

@@ -177,6 +177,31 @@ class TransactionDB:
             )
         ''')
         
+        # Recurring Transaction Patterns
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS recurring_patterns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pattern_name TEXT NOT NULL,
+                account_number TEXT NOT NULL,
+                payee TEXT,
+                category_id INTEGER,
+                subcategory_id INTEGER,
+                typical_amount DECIMAL(12,2),
+                amount_variance DECIMAL(12,2) DEFAULT 0.00,
+                frequency_type TEXT CHECK (frequency_type IN ('weekly', 'biweekly', 'monthly', 'quarterly', 'annual')) NOT NULL,
+                frequency_interval INTEGER DEFAULT 1,
+                next_expected_date DATE,
+                last_occurrence_date DATE,
+                confidence REAL DEFAULT 0.0,
+                occurrence_count INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (category_id) REFERENCES categories (id),
+                FOREIGN KEY (subcategory_id) REFERENCES subcategories (id)
+            )
+        ''')
+        
         # Index for faster duplicate detection
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_hash ON transactions(hash)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_run_date ON transactions(run_date)')
@@ -187,6 +212,12 @@ class TransactionDB:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_monthly_budget_year_month ON monthly_budgets(budget_year, budget_month)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_monthly_budget_status ON monthly_budgets(status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_budget_items_category ON monthly_budget_items(category_id, subcategory_id)')
+        
+        # Recurring patterns indexes for performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_recurring_patterns_account ON recurring_patterns(account_number)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_recurring_patterns_active ON recurring_patterns(is_active)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_recurring_patterns_payee ON recurring_patterns(payee)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_recurring_patterns_next_date ON recurring_patterns(next_expected_date)')
         
         conn.commit()
         conn.close()
@@ -1838,5 +1869,499 @@ class TransactionDB:
         except Exception as e:
             print(f"Error getting default template: {e}")
             return None
+        finally:
+            conn.close()
+    
+    # Recurring Pattern Detection Methods
+    
+    def detect_recurring_patterns(self, account_number: str = None, lookback_days: int = 365, 
+                                min_occurrences: int = 3) -> List[Dict]:
+        """
+        Detect recurring transaction patterns using multi-pass algorithm
+        
+        Args:
+            account_number: Specific account to analyze (None for all accounts)
+            lookback_days: How far back to analyze transactions
+            min_occurrences: Minimum occurrences to consider a pattern
+            
+        Returns:
+            List of detected patterns with confidence scores
+        """
+        from datetime import datetime, timedelta
+        import statistics
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # Calculate cutoff date
+            cutoff_date = (datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+            
+            # Get transactions for analysis
+            where_clause = "WHERE run_date >= ?"
+            params = [cutoff_date]
+            
+            if account_number:
+                where_clause += " AND account_number = ?"
+                params.append(account_number)
+            
+            cursor.execute(f'''
+                SELECT id, run_date, account_number, payee, amount, action, description,
+                       category_id, subcategory_id
+                FROM transactions
+                {where_clause}
+                AND payee IS NOT NULL 
+                AND payee != ''
+                AND (symbol IS NULL OR symbol = '')
+                AND action NOT LIKE '%YOU BOUGHT%'
+                AND action NOT LIKE '%YOU SOLD%' 
+                AND action NOT LIKE '%DIVIDEND RECEIVED%'
+                AND action NOT LIKE '%REINVESTMENT%'
+                ORDER BY run_date ASC
+            ''', params)
+            
+            transactions = cursor.fetchall()
+            detected_patterns = []
+            
+            # Pass 1: Exact amount matching
+            exact_patterns = self._detect_exact_amount_patterns(transactions, min_occurrences)
+            detected_patterns.extend(exact_patterns)
+            
+            # Pass 2: Fuzzy amount matching (for varying bills)
+            fuzzy_patterns = self._detect_fuzzy_amount_patterns(transactions, min_occurrences, exact_patterns)
+            detected_patterns.extend(fuzzy_patterns)
+            
+            # Pass 3: Date pattern analysis
+            date_patterns = self._detect_date_patterns(transactions, min_occurrences, 
+                                                     exact_patterns + fuzzy_patterns)
+            detected_patterns.extend(date_patterns)
+            
+            return detected_patterns
+            
+        except Exception as e:
+            print(f"Error detecting recurring patterns: {e}")
+            return []
+        finally:
+            conn.close()
+    
+    def _detect_exact_amount_patterns(self, transactions: List, min_occurrences: int) -> List[Dict]:
+        """Pass 1: Detect patterns with exact amount matches"""
+        from collections import defaultdict
+        from datetime import datetime, timedelta
+        import statistics
+        
+        # Group by payee + exact amount
+        groups = defaultdict(list)
+        for tx in transactions:
+            tx_id, run_date, account_number, payee, amount, action, description, category_id, subcategory_id = tx
+            key = (payee.lower().strip(), float(amount))
+            groups[key].append({
+                'id': tx_id,
+                'date': datetime.strptime(run_date, '%Y-%m-%d'),
+                'account_number': account_number,
+                'payee': payee,
+                'amount': float(amount),
+                'action': action,
+                'description': description,
+                'category_id': category_id,
+                'subcategory_id': subcategory_id
+            })
+        
+        patterns = []
+        for (payee, amount), occurrences in groups.items():
+            if len(occurrences) < min_occurrences:
+                continue
+                
+            # Calculate intervals between occurrences
+            dates = sorted([occ['date'] for occ in occurrences])
+            intervals = []
+            for i in range(1, len(dates)):
+                interval = (dates[i] - dates[i-1]).days
+                intervals.append(interval)
+            
+            if not intervals:
+                continue
+                
+            # Determine frequency pattern
+            avg_interval = statistics.mean(intervals)
+            interval_std = statistics.stdev(intervals) if len(intervals) > 1 else 0
+            
+            frequency_type, confidence = self._classify_frequency(avg_interval, interval_std)
+            if confidence < 0.3:  # Skip low-confidence patterns
+                continue
+                
+            # Calculate next expected date
+            last_date = max(dates)
+            next_expected = last_date + timedelta(days=int(avg_interval))
+            
+            pattern = {
+                'pattern_name': f"{payee} - ${abs(amount):.2f} ({frequency_type})",
+                'account_number': occurrences[0]['account_number'],
+                'payee': payee,
+                'typical_amount': abs(amount),
+                'amount_variance': 0.0,  # Exact match
+                'frequency_type': frequency_type,
+                'frequency_interval': 1,
+                'next_expected_date': next_expected.strftime('%Y-%m-%d'),
+                'last_occurrence_date': last_date.strftime('%Y-%m-%d'),
+                'confidence': confidence,
+                'occurrence_count': len(occurrences),
+                'category_id': occurrences[0]['category_id'],
+                'subcategory_id': occurrences[0]['subcategory_id'],
+                'pattern_type': 'exact_amount',
+                'raw_intervals': intervals
+            }
+            patterns.append(pattern)
+        
+        return patterns
+    
+    def _detect_fuzzy_amount_patterns(self, transactions: List, min_occurrences: int, 
+                                    existing_patterns: List[Dict]) -> List[Dict]:
+        """Pass 2: Detect patterns with varying amounts (utilities, credit cards)"""
+        from collections import defaultdict
+        from datetime import datetime, timedelta
+        import statistics
+        
+        # Skip transactions already matched in exact patterns
+        existing_payees = {p['payee'].lower().strip() for p in existing_patterns}
+        
+        # Group by payee only (allowing amount variance)
+        groups = defaultdict(list)
+        for tx in transactions:
+            tx_id, run_date, account_number, payee, amount, action, description, category_id, subcategory_id = tx
+            payee_key = payee.lower().strip()
+            
+            if payee_key in existing_payees:
+                continue  # Skip already detected exact patterns
+                
+            groups[payee_key].append({
+                'id': tx_id,
+                'date': datetime.strptime(run_date, '%Y-%m-%d'),
+                'account_number': account_number,
+                'payee': payee,
+                'amount': float(amount),
+                'action': action,
+                'description': description,
+                'category_id': category_id,
+                'subcategory_id': subcategory_id
+            })
+        
+        patterns = []
+        for payee, occurrences in groups.items():
+            if len(occurrences) < min_occurrences:
+                continue
+            
+            # Analyze amount variance
+            amounts = [abs(occ['amount']) for occ in occurrences]
+            avg_amount = statistics.mean(amounts)
+            amount_std = statistics.stdev(amounts) if len(amounts) > 1 else 0
+            amount_cv = amount_std / avg_amount if avg_amount > 0 else 1  # Coefficient of variation
+            
+            # Skip if amounts vary too much (>50% CV typically indicates non-recurring)
+            if amount_cv > 0.5:
+                continue
+            
+            # Calculate date intervals
+            dates = sorted([occ['date'] for occ in occurrences])
+            intervals = []
+            for i in range(1, len(dates)):
+                interval = (dates[i] - dates[i-1]).days
+                intervals.append(interval)
+            
+            if not intervals:
+                continue
+                
+            avg_interval = statistics.mean(intervals)
+            interval_std = statistics.stdev(intervals) if len(intervals) > 1 else 0
+            
+            frequency_type, base_confidence = self._classify_frequency(avg_interval, interval_std)
+            if base_confidence < 0.3:
+                continue
+            
+            # Reduce confidence for fuzzy patterns
+            confidence = base_confidence * (1 - min(amount_cv, 0.3))  # Penalize amount variance
+            
+            if confidence < 0.4:  # Higher threshold for fuzzy patterns
+                continue
+            
+            last_date = max(dates)
+            next_expected = last_date + timedelta(days=int(avg_interval))
+            
+            pattern = {
+                'pattern_name': f"{occurrences[0]['payee']} - ~${avg_amount:.2f} ({frequency_type})",
+                'account_number': occurrences[0]['account_number'],
+                'payee': occurrences[0]['payee'],
+                'typical_amount': avg_amount,
+                'amount_variance': amount_std,
+                'frequency_type': frequency_type,
+                'frequency_interval': 1,
+                'next_expected_date': next_expected.strftime('%Y-%m-%d'),
+                'last_occurrence_date': last_date.strftime('%Y-%m-%d'),
+                'confidence': confidence,
+                'occurrence_count': len(occurrences),
+                'category_id': occurrences[0]['category_id'],
+                'subcategory_id': occurrences[0]['subcategory_id'],
+                'pattern_type': 'fuzzy_amount',
+                'amount_cv': amount_cv,
+                'raw_intervals': intervals
+            }
+            patterns.append(pattern)
+        
+        return patterns
+    
+    def _detect_date_patterns(self, transactions: List, min_occurrences: int, 
+                            existing_patterns: List[Dict]) -> List[Dict]:
+        """Pass 3: Detect day-of-month patterns (rent on 1st, salary on 15th)"""
+        from collections import defaultdict
+        from datetime import datetime, timedelta
+        import statistics
+        
+        existing_payees = {p['payee'].lower().strip() for p in existing_patterns}
+        
+        # Group by payee + day of month
+        day_groups = defaultdict(list)
+        for tx in transactions:
+            tx_id, run_date, account_number, payee, amount, action, description, category_id, subcategory_id = tx
+            payee_key = payee.lower().strip()
+            
+            if payee_key in existing_payees:
+                continue
+                
+            date_obj = datetime.strptime(run_date, '%Y-%m-%d')
+            day_of_month = date_obj.day
+            
+            # Group by day of month (allowing ±2 days variance)
+            for day_range in range(max(1, day_of_month-2), min(32, day_of_month+3)):
+                key = (payee_key, day_range)
+                day_groups[key].append({
+                    'id': tx_id,
+                    'date': date_obj,
+                    'account_number': account_number,
+                    'payee': payee,
+                    'amount': float(amount),
+                    'action': action,
+                    'description': description,
+                    'category_id': category_id,
+                    'subcategory_id': subcategory_id,
+                    'day_of_month': day_of_month
+                })
+        
+        patterns = []
+        for (payee, target_day), occurrences in day_groups.items():
+            if len(occurrences) < min_occurrences:
+                continue
+            
+            # Check if occurrences actually cluster around target day
+            actual_days = [occ['day_of_month'] for occ in occurrences]
+            day_variance = statistics.stdev(actual_days) if len(actual_days) > 1 else 0
+            
+            if day_variance > 3:  # Too much day variance
+                continue
+            
+            # Check if roughly monthly intervals
+            dates = sorted([occ['date'] for occ in occurrences])
+            intervals = [(dates[i] - dates[i-1]).days for i in range(1, len(dates))]
+            
+            if not intervals:
+                continue
+                
+            avg_interval = statistics.mean(intervals)
+            # Look for monthly patterns (25-35 days)
+            if not (25 <= avg_interval <= 35):
+                continue
+            
+            amounts = [abs(occ['amount']) for occ in occurrences]
+            avg_amount = statistics.mean(amounts)
+            amount_std = statistics.stdev(amounts) if len(amounts) > 1 else 0
+            
+            # Higher confidence for consistent day-of-month patterns
+            day_consistency = 1 - (day_variance / 10)  # Normalize day variance
+            interval_consistency = 1 - abs(30 - avg_interval) / 10  # Closeness to 30 days
+            confidence = min(day_consistency * interval_consistency * 0.8, 0.9)
+            
+            if confidence < 0.5:
+                continue
+            
+            last_date = max(dates)
+            # Project to same day next month
+            next_month = last_date.replace(day=1) + timedelta(days=32)
+            next_month = next_month.replace(day=1)  # First of next month
+            try:
+                next_expected = next_month.replace(day=int(statistics.mean(actual_days)))
+            except ValueError:
+                # Handle end-of-month edge cases
+                next_expected = next_month + timedelta(days=27)
+            
+            pattern = {
+                'pattern_name': f"{occurrences[0]['payee']} - Day {int(statistics.mean(actual_days))} (monthly)",
+                'account_number': occurrences[0]['account_number'],
+                'payee': occurrences[0]['payee'],
+                'typical_amount': avg_amount,
+                'amount_variance': amount_std,
+                'frequency_type': 'monthly',
+                'frequency_interval': 1,
+                'next_expected_date': next_expected.strftime('%Y-%m-%d'),
+                'last_occurrence_date': last_date.strftime('%Y-%m-%d'),
+                'confidence': confidence,
+                'occurrence_count': len(occurrences),
+                'category_id': occurrences[0]['category_id'],
+                'subcategory_id': occurrences[0]['subcategory_id'],
+                'pattern_type': 'day_of_month',
+                'typical_day': int(statistics.mean(actual_days)),
+                'day_variance': day_variance
+            }
+            patterns.append(pattern)
+        
+        return patterns
+    
+    def _classify_frequency(self, avg_interval: float, interval_std: float) -> Tuple[str, float]:
+        """Classify frequency type based on average interval and calculate confidence"""
+        
+        # Define frequency ranges with some tolerance
+        frequency_ranges = [
+            ('weekly', 7, 2),      # 5-9 days
+            ('biweekly', 14, 3),   # 11-17 days
+            ('monthly', 30, 5),    # 25-35 days
+            ('quarterly', 90, 15), # 75-105 days
+            ('annual', 365, 30),   # 335-395 days
+        ]
+        
+        best_match = None
+        best_confidence = 0
+        
+        for freq_type, target_days, tolerance in frequency_ranges:
+            if abs(avg_interval - target_days) <= tolerance:
+                # Calculate confidence based on how close to target and how consistent
+                distance_factor = 1 - (abs(avg_interval - target_days) / tolerance)
+                consistency_factor = 1 - min(interval_std / target_days, 0.5)  # Cap at 50% penalty
+                confidence = distance_factor * consistency_factor * 0.9  # Max 90% confidence
+                
+                if confidence > best_confidence:
+                    best_match = freq_type
+                    best_confidence = confidence
+        
+        return best_match or 'irregular', best_confidence
+    
+    def save_recurring_pattern(self, pattern: Dict) -> int:
+        """Save a detected recurring pattern to the database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                INSERT INTO recurring_patterns (
+                    pattern_name, account_number, payee, category_id, subcategory_id,
+                    typical_amount, amount_variance, frequency_type, frequency_interval,
+                    next_expected_date, last_occurrence_date, confidence, occurrence_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                pattern['pattern_name'],
+                pattern['account_number'],
+                pattern['payee'],
+                pattern.get('category_id'),
+                pattern.get('subcategory_id'),
+                pattern['typical_amount'],
+                pattern['amount_variance'],
+                pattern['frequency_type'],
+                pattern['frequency_interval'],
+                pattern['next_expected_date'],
+                pattern['last_occurrence_date'],
+                pattern['confidence'],
+                pattern['occurrence_count']
+            ))
+            
+            pattern_id = cursor.lastrowid
+            conn.commit()
+            return pattern_id
+            
+        except Exception as e:
+            print(f"Error saving recurring pattern: {e}")
+            return None
+        finally:
+            conn.close()
+    
+    def get_recurring_patterns(self, account_number: str = None, active_only: bool = True) -> List[Tuple]:
+        """Get stored recurring patterns"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            where_conditions = []
+            params = []
+            
+            if account_number:
+                where_conditions.append("account_number = ?")
+                params.append(account_number)
+                
+            if active_only:
+                where_conditions.append("is_active = 1")
+            
+            where_clause = ""
+            if where_conditions:
+                where_clause = "WHERE " + " AND ".join(where_conditions)
+            
+            cursor.execute(f'''
+                SELECT rp.id, rp.pattern_name, rp.account_number, rp.payee, rp.typical_amount, 
+                       rp.amount_variance, rp.frequency_type, rp.frequency_interval,
+                       rp.next_expected_date, rp.last_occurrence_date, rp.confidence,
+                       rp.occurrence_count, rp.is_active, rp.created_at,
+                       c.name as category, s.name as subcategory
+                FROM recurring_patterns rp
+                LEFT JOIN categories c ON rp.category_id = c.id
+                LEFT JOIN subcategories s ON rp.subcategory_id = s.id
+                {where_clause}
+                ORDER BY rp.confidence DESC, rp.occurrence_count DESC
+            ''', params)
+            
+            results = cursor.fetchall()
+            return results
+            
+        except Exception as e:
+            print(f"Error getting recurring patterns: {e}")
+            return []
+        finally:
+            conn.close()
+    
+    def update_pattern_next_date(self, pattern_id: int, next_date: str) -> bool:
+        """Update the next expected date for a recurring pattern"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                UPDATE recurring_patterns 
+                SET next_expected_date = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (next_date, pattern_id))
+            
+            success = cursor.rowcount > 0
+            conn.commit()
+            return success
+            
+        except Exception as e:
+            print(f"Error updating pattern next date: {e}")
+            return False
+        finally:
+            conn.close()
+    
+    def deactivate_pattern(self, pattern_id: int) -> bool:
+        """Deactivate a recurring pattern"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                UPDATE recurring_patterns 
+                SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (pattern_id,))
+            
+            success = cursor.rowcount > 0
+            conn.commit()
+            return success
+            
+        except Exception as e:
+            print(f"Error deactivating pattern: {e}")
+            return False
         finally:
             conn.close()
