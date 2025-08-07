@@ -61,6 +61,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
   const [totalTransactions, setTotalTransactions] = useState(0);
   const [showBulkCategoryMenu, setShowBulkCategoryMenu] = useState(false);
   const [selectedBulkCategory, setSelectedBulkCategory] = useState<number | null>(null);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const pageSize = 50;
 
   // Get preferences
@@ -283,6 +284,37 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedTransactions.size === 0) return;
+
+    try {
+      const response = await fetch('/api/transactions/bulk-delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transaction_ids: Array.from(selectedTransactions)
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete transactions');
+      }
+
+      // Remove deleted transactions from local state
+      setTransactions(transactions.filter(t => !selectedTransactions.has(t.id)));
+      setSelectedTransactions(new Set());
+      setShowDeleteConfirmation(false);
+      
+      // Refresh the view to get updated pagination
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete transactions');
+      setShowDeleteConfirmation(false);
+    }
+  };
+
   const toggleTransactionSelection = (transactionId: number) => {
     const newSelection = new Set(selectedTransactions);
     if (newSelection.has(transactionId)) {
@@ -338,7 +370,10 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    // Parse date string safely without timezone conversion issues
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day); // month is 0-based in Date constructor
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
@@ -491,6 +526,13 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
           <span className={styles.selectedCount}>
             {selectedTransactions.size} selected
           </span>
+          <button
+            className={styles.bulkDeleteButton}
+            onClick={() => setShowDeleteConfirmation(true)}
+            title="Delete selected transactions"
+          >
+            Delete Selected
+          </button>
           <div className={styles.bulkCategoryContainer}>
             <button
               className={styles.bulkCategoryButton}
@@ -788,6 +830,39 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirmation && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.confirmationModal}>
+            <div className={styles.modalHeader}>
+              <h3>Confirm Delete</h3>
+            </div>
+            <div className={styles.modalContent}>
+              <p>
+                Are you sure you want to delete {selectedTransactions.size} selected transaction{selectedTransactions.size !== 1 ? 's' : ''}?
+              </p>
+              <p className={styles.warningText}>
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                onClick={() => setShowDeleteConfirmation(false)}
+                className={styles.cancelButton}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className={styles.deleteButton}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

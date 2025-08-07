@@ -58,9 +58,10 @@ export const PercentageChart: React.FC<PercentageChartProps> = ({ card }) => {
     const max = Math.max(...values);
     const range = max - min;
     
-    // Add 10% padding to both ends
+    // Add 10% padding to both ends, but ensure minimum doesn't go below 0% for percentage charts
     const padding = range * 0.1;
-    return [min - padding, max + padding];
+    const paddedMin = Math.max(0, min - padding); // Floor at 0% for percentage charts
+    return [paddedMin, max + padding];
   };
 
   // Helper function to calculate date range from clicked data point

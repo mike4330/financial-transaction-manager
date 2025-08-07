@@ -66,6 +66,18 @@ sqlite3 transactions.db "SELECT * FROM categories;"
 sqlite3 transactions.db "SELECT COUNT(*) FROM transactions WHERE category_id IS NULL;"
 ```
 
+### Recurring Pattern Detection
+```bash
+# Detect recurring patterns from transaction history
+python3 main.py --detect-recurring --lookback-days 365
+
+# Save detected patterns to database for balance projections
+python3 main.py --detect-recurring --save-patterns --lookback-days 365
+
+# Show saved recurring patterns
+python3 main.py --show-patterns
+```
+
 ### Web Interface
 ```bash
 # Start Flask API backend (Terminal 1)
@@ -125,13 +137,22 @@ cd frontend && npm run dev
    - Smart fallback algorithms for unknown transaction formats
    - Batch processing with dry-run capability
 
+9. **Recurring Pattern Detection**: Advanced pattern analysis system
+   - Multi-pass detection algorithm for different pattern types
+   - Exact amount patterns (subscriptions, salary, fixed payments)
+   - Fuzzy amount patterns (utilities with variance, credit cards)
+   - Day-of-month patterns (regular spending on specific dates)
+   - Confidence scoring and pattern classification
+   - Database storage for balance projection integration
+
 ### Frontend Components
 
-9. **frontend/**: React TypeScript web application
-   - Modern single-page application with component-based architecture
-   - Real-time transaction management and visualization
-   - Global time range controls for all charts and data views
-   - Responsive design with professional styling
+10. **frontend/**: React TypeScript web application
+    - Modern single-page application with component-based architecture
+    - Real-time transaction management and visualization
+    - Global time range controls for all charts and data views
+    - Responsive design with professional styling
+    - Recurring patterns management interface for balance projections
 
 **Key Frontend Features:**
 - **Configurable Dashboard**: 2x2 grid layout with flexible card positioning system
@@ -149,6 +170,7 @@ cd frontend && npm run dev
 - `subcategories`: Subcategory definitions linked to parent categories
 - `classification_patterns`: Learned patterns for instant transaction classification
 - `processed_files`: Tracks processed CSV files to prevent reprocessing
+- `recurring_patterns`: Detected recurring transaction patterns for balance projections
 
 **Key Features:**
 - Hash-based duplicate detection
@@ -266,6 +288,103 @@ cd frontend && npm run dev  # Start frontend
 4. **Investment transactions intentionally have no payee** (symbol is the identifier)
 5. **Manual work decreases over time** as the pattern cache grows
 
+## Recurring Pattern Detection System
+
+The system automatically detects recurring transactions to enable accurate balance projections and future financial planning.
+
+### Pattern Detection Algorithm
+
+**Multi-Pass Detection Strategy:**
+1. **Pass 1: Exact Amount Matching**
+   - Groups transactions by payee + exact amount
+   - Calculates intervals between occurrences
+   - Identifies frequency patterns (weekly, biweekly, monthly, quarterly, annual)
+   - Best for: Subscriptions, salary, fixed bills
+
+2. **Pass 2: Fuzzy Amount Matching**
+   - Groups by payee with amount variance tolerance (≤50% coefficient of variation)
+   - Handles varying bills like utilities, credit card payments
+   - Applies confidence penalties for amount inconsistency
+   - Best for: Utilities, insurance, variable recurring bills
+
+3. **Pass 3: Day-of-Month Patterns**
+   - Detects transactions occurring on consistent calendar days (±2 day tolerance)
+   - Focuses on monthly patterns (25-35 day intervals)
+   - High confidence for consistent day-of-month spending
+   - Best for: Rent, salary, monthly subscriptions on specific dates
+
+### Pattern Classification
+
+**Confidence Levels:**
+- **High (≥70%)**: Green indicator - Consistent historical data, reliable for projections
+- **Medium (50-69%)**: Yellow indicator - Some variation, moderate reliability
+- **Low (<50%)**: Red indicator - Inconsistent data, manual review recommended
+
+**Pattern Types:**
+- `exact_amount`: Fixed payments (subscriptions, salary)
+- `fuzzy_amount`: Variable amounts with low variance (utilities)
+- `day_of_month`: Regular spending on specific calendar days
+
+### Usage Workflow
+
+**Command Line:**
+```bash
+# Detect patterns (analysis only)
+python3 main.py --detect-recurring --lookback-days 365
+
+# Detect and save patterns to database
+python3 main.py --detect-recurring --save-patterns --lookback-days 365
+
+# View saved patterns
+python3 main.py --show-patterns
+```
+
+**Web Interface:**
+1. Navigate to "Patterns" page in web interface
+2. Click "Detect New Patterns" and set lookback period
+3. Review detected patterns with confidence scores
+4. Use "Select High Confidence" for quick approval of reliable patterns
+5. Click "Save Selected" to store patterns for balance projections
+6. Manage active patterns in "Saved Patterns" view
+
+### Pattern Examples from Real Data
+
+**High Confidence Patterns:**
+- Direct Deposit: $4,320.24 biweekly (76.7% confidence)
+- Spotify: $19.99 monthly (90.0% confidence)
+- Netflix: $17.99 monthly (71.5% confidence)
+- Regular Transfers: $45.00 biweekly (71.2% confidence)
+
+**Medium Confidence Patterns:**
+- State Farm Insurance: ~$281.28 monthly ±$0.61 (61.7% confidence)
+- Verizon: $163.00 monthly (58.5% confidence)
+- PayPal Transfers: $200.00 on 3rd of month (67.8% confidence)
+
+**Variable Patterns:**
+- Taco Bell: ~$24.16 biweekly ±$2.04 (54.4% confidence)
+- Gas Stations: Day-of-month patterns with amount variance
+
+### Database Storage
+
+**recurring_patterns Table Schema:**
+- Pattern identification (name, payee, account)
+- Amount details (typical_amount, amount_variance)
+- Frequency data (frequency_type, frequency_interval)
+- Prediction data (next_expected_date, last_occurrence_date)
+- Quality metrics (confidence, occurrence_count)
+- Management fields (is_active, created_at, updated_at)
+
+### API Integration
+
+**Recurring Pattern Endpoints:**
+- `POST /api/recurring-patterns/detect` - Detect patterns with configurable lookback period
+- `GET /api/recurring-patterns` - Retrieve saved active patterns
+- `POST /api/recurring-patterns/save` - Save individual detected pattern
+- `PUT /api/recurring-patterns/<id>` - Update pattern (activate/deactivate)
+- `DELETE /api/recurring-patterns/<id>` - Deactivate pattern
+
+All endpoints return JSON with confidence levels, pattern metadata, and proper error handling.
+
 ## Classification Rules
 
 ### Merchant-Specific Rules
@@ -321,7 +440,8 @@ cd frontend && npm run dev  # Start frontend
     │   │   ├── DashboardCard.tsx   # Individual card wrapper component
     │   │   ├── StatCard.tsx        # Single-number display cards
     │   │   ├── SummaryCard.tsx     # Top-N list cards
-    │   │   └── GenericChart.tsx    # Timeseries chart component
+    │   │   ├── GenericChart.tsx    # Timeseries chart component
+    │   │   └── RecurringPatterns.tsx # Pattern detection and management interface
     │   ├── contexts/      # React contexts (TimeRangeContext)
     │   ├── types/         # TypeScript interfaces (dashboard.ts)
     │   ├── config/        # Configuration files (dashboardConfig.ts, chartConfig.ts)
@@ -657,3 +777,36 @@ The preferences system integrates with existing API endpoints:
 - **Context awareness**: Show only relevant preferences per page
 - **Immediate feedback**: Apply changes instantly when possible
 - **Reset functionality**: Always provide way to restore defaults
+
+## Recent System Enhancements
+
+### Balance Projection System
+Complete implementation of Quicken-style balance forecasting:
+
+- **Interactive Chart**: SVG-based balance projection with transaction event markers
+- **Smart Markers**: Shows colored dots only on days with projected transactions
+- **Rich Tooltips**: Hover over markers to see transaction details, amounts, and confidence
+- **Account-Specific**: Focuses on Individual TOD account (Z06431462) for accurate projections
+- **API Integration**: Real-time calculation using stored recurring patterns
+
+### Enhanced Pattern Detection
+Improved recurring transaction detection with investment filtering:
+
+- **Investment Exclusion**: Automatically filters out stock trades, dividends, and reinvestments
+- **Payee Data Quality**: Fixed 20+ mortgage payments and 46+ utility transactions with missing payee data
+- **Mortgage Detection**: Now properly identifies "Select Portfolio Servicing" mortgage payments as recurring
+- **Utility Patterns**: NOVEC and other bill payments now detected as fuzzy amount patterns
+- **Fuzzy Matching**: Handles varying amounts (mortgage: $1500-$1581, utilities with seasonal variation)
+
+### Data Quality Improvements
+Database cleanup for better pattern recognition:
+
+- **Payee Standardization**: Updated "No Description" payees to meaningful names
+- **Investment Filtering**: Added SQL filters to exclude symbol-based transactions
+- **Pattern Count**: Increased from 37 to 48+ detected patterns after cleanup
+
+**Key Files Updated:**
+- `database.py`: Enhanced pattern detection SQL with investment filters
+- `RecurringPatterns.tsx`: Interactive chart with transaction markers and tooltips
+- `RecurringPatterns.module.css`: Tooltip styling and responsive design
+- `api_server.py`: Fixed DELETE endpoint parameter handling

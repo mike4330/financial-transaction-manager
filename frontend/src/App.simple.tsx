@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import TransactionsList from './components/TransactionsList';
 import TreeMap from './components/TreeMap';
 import Budget from './components/Budget';
+import RecurringPatterns from './components/RecurringPatterns';
 import DisplayPreferences from './components/DisplayPreferences';
 import { defaultDashboardConfig } from './config/dashboardConfig';
 import styles from './components/App.module.css';
@@ -13,7 +14,7 @@ import styles from './components/App.module.css';
 const AppContent: React.FC = () => {
   const [apiStatus, setApiStatus] = useState<'loading' | 'connected' | 'failed'>('loading');
   const [stats, setStats] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState<'home' | 'transactions' | 'treemap' | 'budget'>('home');
+  const [currentPage, setCurrentPage] = useState<'home' | 'transactions' | 'treemap' | 'budget' | 'patterns'>('home');
   const [showPreferences, setShowPreferences] = useState(false);
   const [transactionFilters, setTransactionFilters] = useState<{category?: string, subcategory?: string}>({});
   const { homePreferences } = usePreferences();
@@ -76,6 +77,12 @@ const AppContent: React.FC = () => {
             >
               Budget
             </button>
+            <button
+              onClick={() => setCurrentPage('patterns')}
+              className={`${styles.navButton} ${currentPage === 'patterns' ? styles.navButtonActive : ''}`}
+            >
+              Patterns
+            </button>
           </div>
           
           <div className={styles.navRight}>
@@ -136,6 +143,8 @@ const AppContent: React.FC = () => {
         {currentPage === 'treemap' && <TreeMap onNavigateToTransactions={handleNavigateToTransactions} />}
         
         {currentPage === 'budget' && <Budget />}
+        
+        {currentPage === 'patterns' && <RecurringPatterns />}
         
         {/* Display Preferences Modal */}
         <DisplayPreferences 

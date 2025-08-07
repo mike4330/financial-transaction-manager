@@ -24,6 +24,14 @@ interface GenericChartProps {
   config: ChartConfig;
 }
 
+// Utility function to format dates without timezone conversion issues
+const formatDateSafe = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
   const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,9 +86,10 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
       if (isNaN(parsedDate.getTime())) {
         console.error('Invalid date created from:', monthLabel);
         // Fallback: try parsing differently
+        const today = new Date();
         return {
-          startDate: new Date().toISOString().split('T')[0],
-          endDate: new Date().toISOString().split('T')[0],
+          startDate: formatDateSafe(today),
+          endDate: formatDateSafe(today),
           title: `${config.title} - ${monthLabel}`
         };
       }
@@ -93,9 +102,10 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
       const endOfWeek = new Date(startOfWeek);
       endOfWeek.setDate(startOfWeek.getDate() + 6);
       
+      
       return {
-        startDate: startOfWeek.toISOString().split('T')[0],
-        endDate: endOfWeek.toISOString().split('T')[0],
+        startDate: formatDateSafe(startOfWeek),
+        endDate: formatDateSafe(endOfWeek),
         title: `${config.title} - Week of ${monthLabel}`
       };
     } else {
@@ -106,9 +116,10 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
       
       if (parts.length !== 2) {
         console.error('Unexpected month label format:', monthLabel);
+        const today = new Date();
         return {
-          startDate: new Date().toISOString().split('T')[0],
-          endDate: new Date().toISOString().split('T')[0],
+          startDate: formatDateSafe(today),
+          endDate: formatDateSafe(today),
           title: `${config.title} - ${monthLabel}`
         };
       }
@@ -121,9 +132,10 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
       
       if (isNaN(year) || monthIndex === -1) {
         console.error('Invalid year or month:', year, monthName);
+        const today = new Date();
         return {
-          startDate: new Date().toISOString().split('T')[0],
-          endDate: new Date().toISOString().split('T')[0],
+          startDate: formatDateSafe(today),
+          endDate: formatDateSafe(today),
           title: `${config.title} - ${monthLabel}`
         };
       }
@@ -133,9 +145,10 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
       
       console.log('Calculated date range:', startDate, endDate);
       
+      
       return {
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
+        startDate: formatDateSafe(startDate),
+        endDate: formatDateSafe(endDate),
         title: `${config.title} - ${monthName} ${year}`
       };
     }

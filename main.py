@@ -104,6 +104,18 @@ def main():
     parser.add_argument('--web-simple',
                        action='store_true',
                        help='Launch simple web interface (native Streamlit)')
+    parser.add_argument('--detect-recurring',
+                       action='store_true',
+                       help='Detect recurring transaction patterns')
+    parser.add_argument('--save-patterns',
+                       action='store_true',
+                       help='Save detected patterns to database (use with --detect-recurring)')
+    parser.add_argument('--show-patterns',
+                       action='store_true',
+                       help='Show existing recurring patterns')
+    parser.add_argument('--lookback-days',
+                       type=int, default=365, metavar='DAYS',
+                       help='Days to look back for pattern detection (default: 365)')
     
     args = parser.parse_args()
     
@@ -252,8 +264,18 @@ def main():
             logger.error(f"Error in monitoring mode: {e}")
             return 1
     
+    # Recurring pattern detection
+    if args.detect_recurring:
+        patterns = detect_recurring_patterns(db, args.lookback_days)
+        if args.save_patterns:
+            save_detected_patterns(db, patterns)
+    
+    # Show recurring patterns  
+    if args.show_patterns:
+        show_recurring_patterns(db)
+    
     # If no action specified, show help
-    if not (args.process_existing or args.monitor or args.stats or args.categories or args.uncategorized or args.categorize or args.categorizedesc or args.ai_classify or args.ai_classify_ids or args.web or args.web_simple):
+    if not (args.process_existing or args.monitor or args.stats or args.categories or args.uncategorized or args.categorize or args.categorizedesc or args.ai_classify or args.ai_classify_ids or args.web or args.web_simple or args.detect_recurring or args.show_patterns):
         parser.print_help()
         return 1
     
@@ -513,6 +535,87 @@ def run_ai_fix_issues(db: TransactionDB, sample_size: int, auto_apply: bool):
     except Exception as e:
         logging.error(f"Error in AI fix: {e}")
         return 0
+
+def detect_recurring_patterns(db: TransactionDB, lookback_days: int):
+    """Detect recurring transaction patterns and display results"""
+    print(f"\n🔍 Detecting recurring patterns (looking back {lookback_days} days)...")
+    
+    patterns = db.detect_recurring_patterns(lookback_days=lookback_days)
+    
+    if not patterns:
+        print("❌ No recurring patterns detected")
+        return []
+    
+    print(f"\n✅ Found {len(patterns)} recurring patterns:")
+    print("=" * 120)
+    
+    for i, pattern in enumerate(patterns, 1):
+        confidence_pct = pattern['confidence'] * 100
+        confidence_icon = "🟢" if confidence_pct >= 70 else "🟡" if confidence_pct >= 50 else "🔴"
+        
+        print(f"{i:2d}. {confidence_icon} {pattern['pattern_name']}")
+        print(f"     Account: {pattern['account_number']}")
+        print(f"     Frequency: {pattern['frequency_type']} (every {pattern.get('frequency_interval', 1)})")
+        print(f"     Amount: ${pattern['typical_amount']:.2f}")
+        if pattern['amount_variance'] > 0:
+            print(f"     Amount variance: ±${pattern['amount_variance']:.2f}")
+        print(f"     Confidence: {confidence_pct:.1f}%")
+        print(f"     Occurrences: {pattern['occurrence_count']}")
+        print(f"     Last seen: {pattern['last_occurrence_date']}")
+        print(f"     Next expected: {pattern['next_expected_date']}")
+        print(f"     Pattern type: {pattern.get('pattern_type', 'unknown')}")
+        print()
+    
+    return patterns
+
+def save_detected_patterns(db: TransactionDB, patterns: List):
+    """Save detected patterns to the database"""
+    if not patterns:
+        print("❌ No patterns to save")
+        return
+    
+    print(f"\n💾 Saving {len(patterns)} patterns to database...")
+    
+    saved_count = 0
+    for pattern in patterns:
+        pattern_id = db.save_recurring_pattern(pattern)
+        if pattern_id:
+            saved_count += 1
+            print(f"✅ Saved: {pattern['pattern_name']}")
+        else:
+            print(f"❌ Failed to save: {pattern['pattern_name']}")
+    
+    print(f"\n✅ Successfully saved {saved_count}/{len(patterns)} patterns")
+
+def show_recurring_patterns(db: TransactionDB):
+    """Display stored recurring patterns"""
+    print("\n📊 Stored Recurring Patterns:")
+    
+    patterns = db.get_recurring_patterns()
+    
+    if not patterns:
+        print("❌ No stored patterns found")
+        return
+    
+    print("=" * 120)
+    print(f"{'ID':<3} {'Pattern Name':<40} {'Account':<12} {'Amount':<12} {'Frequency':<10} {'Confidence':<10} {'Next Due':<12}")
+    print("=" * 120)
+    
+    for pattern in patterns:
+        pattern_id, pattern_name, account_number, payee, typical_amount, amount_variance, frequency_type, frequency_interval, next_expected_date, last_occurrence_date, confidence, occurrence_count, is_active, created_at, category, subcategory = pattern
+        
+        status_icon = "🟢" if is_active else "🔴"
+        confidence_pct = confidence * 100 if confidence else 0
+        amount_str = f"${typical_amount:.2f}"
+        if amount_variance and amount_variance > 0:
+            amount_str += f"±{amount_variance:.0f}"
+        
+        print(f"{status_icon}{pattern_id:<2} {pattern_name[:38]:<40} {account_number[:10]:<12} {amount_str:<12} {frequency_type:<10} {confidence_pct:>6.1f}%   {next_expected_date:<12}")
+    
+    print("=" * 120)
+    print(f"Total patterns: {len(patterns)}")
+    active_count = sum(1 for p in patterns if p[12])  # is_active column
+    print(f"Active patterns: {active_count}")
 
 def generate_html_report(db: TransactionDB, html_file: str):
     """Generate HTML report"""

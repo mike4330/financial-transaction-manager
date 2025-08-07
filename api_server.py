@@ -262,6 +262,41 @@ def bulk_categorize():
         logger.error(f"Error bulk categorizing: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/transactions/bulk-delete', methods=['DELETE'])
+def bulk_delete():
+    """Delete multiple transactions"""
+    try:
+        data = request.get_json()
+        transaction_ids = data.get('transaction_ids', [])
+        
+        if not transaction_ids:
+            return jsonify({"error": "No transaction IDs provided"}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Delete all specified transactions
+        placeholders = ','.join(['?' for _ in transaction_ids])
+        query = f"""
+            DELETE FROM transactions 
+            WHERE id IN ({placeholders})
+        """
+        
+        cursor.execute(query, transaction_ids)
+        
+        deleted_count = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "message": f"Deleted {deleted_count} transactions",
+            "deleted_count": deleted_count
+        })
+        
+    except Exception as e:
+        logger.error(f"Error bulk deleting: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
     """Get all categories and subcategories"""
@@ -479,6 +514,11 @@ def get_monthly_budget(year: int, month: int):
             return jsonify({"error": f"No budget found for {year}-{month:02d}"}), 404
         
         monthly_budget_id = monthly_budget['id']
+        
+        # Update actual amounts to ensure they're current
+        from database import TransactionDB
+        db = TransactionDB()
+        db.update_actual_amounts(year, month)
         
         # Get budget items with category/subcategory names
         budget_items = conn.execute('''
@@ -744,6 +784,214 @@ def get_available_budget_months():
         logger.error(f"Error fetching available budget months: {e}")
         return jsonify({"error": str(e)}), 500
 
+# Recurring Patterns Endpoints
+
+@app.route('/api/recurring-patterns/detect', methods=['POST'])
+def detect_recurring_patterns():
+    """Detect recurring patterns in transactions"""
+    try:
+        data = request.get_json() or {}
+        lookback_days = data.get('lookback_days', 365)
+        account_number = data.get('account_number')  # Optional account filter
+        
+        from database import TransactionDB
+        db = TransactionDB()
+        
+        patterns = db.detect_recurring_patterns(
+            account_number=account_number,
+            lookback_days=lookback_days
+        )
+        
+        # Convert patterns to API-friendly format
+        api_patterns = []
+        for pattern in patterns:
+            confidence_pct = pattern['confidence'] * 100
+            api_pattern = {
+                'pattern_name': pattern['pattern_name'],
+                'account_number': pattern['account_number'],
+                'payee': pattern['payee'],
+                'typical_amount': float(pattern['typical_amount']),
+                'amount_variance': float(pattern.get('amount_variance', 0)),
+                'frequency_type': pattern['frequency_type'],
+                'frequency_interval': pattern.get('frequency_interval', 1),
+                'next_expected_date': pattern['next_expected_date'],
+                'last_occurrence_date': pattern['last_occurrence_date'],
+                'confidence': round(confidence_pct, 1),
+                'confidence_level': _get_confidence_level(pattern['confidence']),
+                'occurrence_count': pattern['occurrence_count'],
+                'pattern_type': pattern.get('pattern_type', 'unknown'),
+                'category_id': pattern.get('category_id'),
+                'subcategory_id': pattern.get('subcategory_id')
+            }
+            api_patterns.append(api_pattern)
+        
+        return jsonify({
+            'patterns': api_patterns,
+            'total_detected': len(patterns),
+            'lookback_days': lookback_days
+        })
+        
+    except Exception as e:
+        logger.error(f"Error detecting recurring patterns: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/recurring-patterns', methods=['GET'])
+def get_recurring_patterns():
+    """Get saved recurring patterns"""
+    try:
+        account_number = request.args.get('account_number')
+        active_only = request.args.get('active_only', 'true') == 'true'
+        
+        from database import TransactionDB
+        db = TransactionDB()
+        
+        patterns = db.get_recurring_patterns(
+            account_number=account_number, 
+            active_only=active_only
+        )
+        
+        # Convert to API format
+        api_patterns = []
+        for pattern in patterns:
+            pattern_id, pattern_name, account_number, payee, typical_amount, amount_variance, frequency_type, frequency_interval, next_expected_date, last_occurrence_date, confidence, occurrence_count, is_active, created_at, category, subcategory = pattern
+            
+            confidence_pct = (confidence * 100) if confidence else 0
+            api_pattern = {
+                'id': pattern_id,
+                'pattern_name': pattern_name,
+                'account_number': account_number,
+                'payee': payee,
+                'typical_amount': float(typical_amount) if typical_amount else 0,
+                'amount_variance': float(amount_variance) if amount_variance else 0,
+                'frequency_type': frequency_type,
+                'frequency_interval': frequency_interval,
+                'next_expected_date': next_expected_date,
+                'last_occurrence_date': last_occurrence_date,
+                'confidence': round(confidence_pct, 1),
+                'confidence_level': _get_confidence_level(confidence or 0),
+                'occurrence_count': occurrence_count,
+                'is_active': bool(is_active),
+                'created_at': created_at,
+                'category': category,
+                'subcategory': subcategory
+            }
+            api_patterns.append(api_pattern)
+        
+        return jsonify({
+            'patterns': api_patterns,
+            'total_count': len(api_patterns)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting recurring patterns: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/recurring-patterns/save', methods=['POST'])
+def save_recurring_pattern():
+    """Save a detected pattern to the database"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        from database import TransactionDB
+        db = TransactionDB()
+        
+        # Convert API format back to internal format
+        pattern = {
+            'pattern_name': data['pattern_name'],
+            'account_number': data['account_number'],
+            'payee': data['payee'],
+            'typical_amount': data['typical_amount'],
+            'amount_variance': data.get('amount_variance', 0),
+            'frequency_type': data['frequency_type'],
+            'frequency_interval': data.get('frequency_interval', 1),
+            'next_expected_date': data['next_expected_date'],
+            'last_occurrence_date': data['last_occurrence_date'],
+            'confidence': data['confidence'] / 100,  # Convert percentage back to decimal
+            'occurrence_count': data['occurrence_count'],
+            'category_id': data.get('category_id'),
+            'subcategory_id': data.get('subcategory_id')
+        }
+        
+        pattern_id = db.save_recurring_pattern(pattern)
+        
+        if pattern_id:
+            return jsonify({
+                'success': True,
+                'pattern_id': pattern_id,
+                'message': 'Pattern saved successfully'
+            })
+        else:
+            return jsonify({"error": "Failed to save pattern"}), 500
+        
+    except Exception as e:
+        logger.error(f"Error saving recurring pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/recurring-patterns/<int:pattern_id>', methods=['PUT'])
+def update_recurring_pattern():
+    """Update a recurring pattern (mainly for activating/deactivating)"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        from database import TransactionDB
+        db = TransactionDB()
+        
+        # For now, only support activate/deactivate
+        if 'is_active' in data and not data['is_active']:
+            success = db.deactivate_pattern(pattern_id)
+        elif 'next_expected_date' in data:
+            success = db.update_pattern_next_date(pattern_id, data['next_expected_date'])
+        else:
+            return jsonify({"error": "Invalid update operation"}), 400
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Pattern updated successfully'
+            })
+        else:
+            return jsonify({"error": "Failed to update pattern"}), 500
+        
+    except Exception as e:
+        logger.error(f"Error updating recurring pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/recurring-patterns/<int:pattern_id>', methods=['DELETE'])
+def delete_recurring_pattern(pattern_id):
+    """Delete (deactivate) a recurring pattern"""
+    try:
+        from database import TransactionDB
+        db = TransactionDB()
+        
+        success = db.deactivate_pattern(pattern_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Pattern deactivated successfully'
+            })
+        else:
+            return jsonify({"error": "Failed to deactivate pattern"}), 500
+        
+    except Exception as e:
+        logger.error(f"Error deactivating recurring pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+def _get_confidence_level(confidence: float) -> str:
+    """Get confidence level category"""
+    if confidence >= 0.7:
+        return "high"
+    elif confidence >= 0.5:
+        return "medium"
+    else:
+        return "low"
+
 def _get_confidence_description(confidence: float) -> str:
     """Get human-readable confidence description"""
     if confidence >= 0.8:
@@ -754,6 +1002,136 @@ def _get_confidence_description(confidence: float) -> str:
         return "Low confidence - limited or inconsistent data"
     else:
         return "Very low confidence - insufficient historical data"
+
+@app.route('/api/balance-projection', methods=['POST'])
+def calculate_balance_projection():
+    """Calculate future balance projection using recurring patterns"""
+    try:
+        data = request.get_json() or {}
+        starting_balance = data.get('starting_balance', 10000.0)  # Default starting balance
+        projection_days = data.get('projection_days', 90)
+        account_number = 'Z06431462'  # Individual - TOD account only
+        
+        from database import TransactionDB
+        from datetime import datetime, timedelta
+        
+        db = TransactionDB()
+        
+        # Get active recurring patterns for the Individual - TOD account
+        patterns = db.get_recurring_patterns(account_number=account_number, active_only=True)
+        
+        # Generate daily projection
+        current_date = datetime.now()
+        projection_data = []
+        running_balance = starting_balance
+        
+        for day_offset in range(projection_days + 1):
+            projection_date = current_date + timedelta(days=day_offset)
+            daily_change = 0
+            projected_transactions = []
+            
+            # Check each pattern for occurrences on this date
+            for pattern in patterns:
+                pattern_id, pattern_name, acc_num, payee, typical_amount, amount_variance, frequency_type, frequency_interval, next_expected_date, last_occurrence_date, confidence, occurrence_count, is_active, created_at, category, subcategory = pattern
+                
+                # Parse next expected date
+                try:
+                    expected_date = datetime.strptime(next_expected_date, '%Y-%m-%d')
+                except:
+                    continue
+                
+                # Check if this pattern occurs on the current projection date
+                should_occur = False
+                
+                if frequency_type == 'weekly':
+                    # Weekly patterns: check if same day of week and appropriate interval
+                    days_diff = (projection_date - expected_date).days
+                    if days_diff >= 0 and days_diff % (7 * frequency_interval) == 0:
+                        should_occur = True
+                        
+                elif frequency_type == 'biweekly':
+                    # Biweekly patterns: check if same day and 14-day intervals
+                    days_diff = (projection_date - expected_date).days
+                    if days_diff >= 0 and days_diff % 14 == 0:
+                        should_occur = True
+                        
+                elif frequency_type == 'monthly':
+                    # Monthly patterns: check if same day of month
+                    if (projection_date.day == expected_date.day and 
+                        projection_date >= expected_date and
+                        (projection_date.year > expected_date.year or 
+                         projection_date.month > expected_date.month)):
+                        should_occur = True
+                    elif projection_date.date() == expected_date.date():
+                        should_occur = True
+                        
+                elif frequency_type == 'quarterly':
+                    # Quarterly patterns: check if same day and 3-month intervals
+                    if (projection_date.day == expected_date.day and
+                        projection_date >= expected_date):
+                        months_diff = (projection_date.year - expected_date.year) * 12 + projection_date.month - expected_date.month
+                        if months_diff > 0 and months_diff % 3 == 0:
+                            should_occur = True
+                    elif projection_date.date() == expected_date.date():
+                        should_occur = True
+                
+                if should_occur:
+                    # Apply confidence weighting to the transaction
+                    confidence_factor = confidence if confidence else 0.5
+                    weighted_amount = typical_amount * confidence_factor
+                    
+                    # Determine if this is income (positive) or expense (negative)
+                    # Income patterns: direct deposit, dividends, transfers in
+                    is_income = ('direct deposit' in pattern_name.lower() or 
+                               'dividend' in pattern_name.lower() or
+                               'interest' in pattern_name.lower())
+                    
+                    transaction_amount = weighted_amount if is_income else -weighted_amount
+                    daily_change += transaction_amount
+                    
+                    projected_transactions.append({
+                        'pattern_name': pattern_name,
+                        'payee': payee,
+                        'amount': transaction_amount,
+                        'confidence': round(confidence * 100, 1) if confidence else 50,
+                        'category': category,
+                        'subcategory': subcategory
+                    })
+            
+            running_balance += daily_change
+            
+            projection_data.append({
+                'date': projection_date.strftime('%Y-%m-%d'),
+                'balance': round(running_balance, 2),
+                'daily_change': round(daily_change, 2),
+                'projected_transactions': projected_transactions
+            })
+        
+        # Calculate summary statistics
+        final_balance = projection_data[-1]['balance'] if projection_data else starting_balance
+        total_change = final_balance - starting_balance
+        
+        # Calculate projected income and expenses
+        total_income = sum(day['daily_change'] for day in projection_data if day['daily_change'] > 0)
+        total_expenses = abs(sum(day['daily_change'] for day in projection_data if day['daily_change'] < 0))
+        
+        return jsonify({
+            'account_number': account_number,
+            'account_name': 'Individual - TOD',
+            'starting_balance': starting_balance,
+            'final_balance': round(final_balance, 2),
+            'total_change': round(total_change, 2),
+            'projection_days': projection_days,
+            'projected_income': round(total_income, 2),
+            'projected_expenses': round(total_expenses, 2),
+            'patterns_used': len([p for p in patterns if p[4] is not None]),  # Count valid patterns
+            'daily_projections': projection_data,
+            'generated_at': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error calculating balance projection: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     print("🚀 Starting Flask API Server...")
