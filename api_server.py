@@ -751,6 +751,319 @@ def create_next_month_budget():
         logger.error(f"Error creating next month budget: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/budget/<int:year>/<int:month>/spending-by-category', methods=['GET'])
+def get_monthly_spending_by_category(year: int, month: int):
+    """Get spending by category for pie chart visualization"""
+    try:
+        conn = get_db_connection()
+        
+        # Calculate month start/end dates
+        start_date = f"{year}-{month:02d}-01"
+        if month == 12:
+            end_date = f"{year + 1}-01-01"
+        else:
+            end_date = f"{year}-{month + 1:02d}-01"
+        
+        # Get spending by category (expenses only, exclude transfers and investments)
+        spending = conn.execute('''
+            SELECT c.name as category, 
+                   SUM(ABS(t.amount)) as total_spent,
+                   COUNT(t.id) as transaction_count
+            FROM transactions t
+            JOIN categories c ON t.category_id = c.id
+            WHERE t.run_date >= ? AND t.run_date < ?
+            AND t.amount < 0  -- Only expenses (negative amounts)
+            AND c.name NOT IN ('Banking', 'Investment', 'Transfer')  -- Exclude transfers/investments
+            GROUP BY c.id, c.name
+            HAVING total_spent > 0
+            ORDER BY total_spent DESC
+        ''', (start_date, end_date)).fetchall()
+        
+        conn.close()
+        
+        categories = []
+        total_spending = 0
+        
+        for row in spending:
+            amount = float(row['total_spent'])
+            total_spending += amount
+            categories.append({
+                "category": row['category'],
+                "amount": amount,
+                "transaction_count": row['transaction_count']
+            })
+        
+        # Calculate percentages
+        for category in categories:
+            category["percentage"] = (category["amount"] / total_spending * 100) if total_spending > 0 else 0
+        
+        return jsonify({
+            "year": year,
+            "month": month,
+            "categories": categories,
+            "total_spending": total_spending
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching category spending: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/budget/<int:year>/<int:month>/unbudgeted-categories', methods=['GET'])
+def get_unbudgeted_categories(year: int, month: int):
+    """Get categories that have spending but no budget line item for the given month"""
+    try:
+        conn = get_db_connection()
+        
+        # Calculate date range for the month (same format as pie chart)
+        start_date = f"{year}-{month:02d}-01"
+        if month == 12:
+            end_date = f"{year + 1}-01-01"
+        else:
+            end_date = f"{year}-{month + 1:02d}-01"
+        
+        # Get all spending categories (exact same query as pie chart)
+        spending_query = conn.execute('''
+            SELECT c.name as category, 
+                   SUM(ABS(t.amount)) as total_spent,
+                   COUNT(t.id) as transaction_count
+            FROM transactions t
+            JOIN categories c ON t.category_id = c.id
+            WHERE t.run_date >= ? AND t.run_date < ?
+            AND t.amount < 0  -- Only expenses (negative amounts)
+            AND c.name NOT IN ('Banking', 'Investment', 'Transfer')  -- Exclude transfers/investments
+            GROUP BY c.id, c.name
+            HAVING total_spent > 0
+            ORDER BY total_spent DESC
+        ''', (start_date, end_date)).fetchall()
+        
+        # Build spending dictionary
+        spending_categories = {}
+        total_spending = 0
+        for row in spending_query:
+            spending_categories[row['category']] = {
+                'amount': float(row['total_spent']),
+                'transaction_count': row['transaction_count']
+            }
+            total_spending += row['total_spent']
+        
+        # Get all budgeted categories for this month
+        budgeted_query = conn.execute('''
+            SELECT DISTINCT c.name as category
+            FROM monthly_budget_items mbi
+            JOIN monthly_budgets mb ON mbi.monthly_budget_id = mb.id
+            JOIN categories c ON mbi.category_id = c.id
+            WHERE mb.budget_year = ? AND mb.budget_month = ?
+        ''', (year, month)).fetchall()
+        
+        # Build budgeted set
+        budgeted_categories = {row['category'] for row in budgeted_query}
+        
+        conn.close()
+        
+        # Debug output
+        print(f"DEBUG: Spending categories: {list(spending_categories.keys())}")
+        print(f"DEBUG: Budgeted categories: {list(budgeted_categories)}")
+        
+        # Find unbudgeted categories by set difference
+        unbudgeted_category_names = set(spending_categories.keys()) - budgeted_categories
+        print(f"DEBUG: Unbudgeted categories: {list(unbudgeted_category_names)}")
+        
+        # Build result
+        categories = []
+        total_unbudgeted = 0
+        
+        for category_name in unbudgeted_category_names:
+            spending_data = spending_categories[category_name]
+            percentage = (spending_data['amount'] / total_spending * 100) if total_spending > 0 else 0
+            
+            category_data = {
+                "category": category_name,
+                "amount": spending_data['amount'],
+                "percentage": percentage,
+                "transaction_count": spending_data['transaction_count']
+            }
+            categories.append(category_data)
+            total_unbudgeted += spending_data['amount']
+        
+        # Sort by amount descending
+        categories.sort(key=lambda x: x['amount'], reverse=True)
+        
+        return jsonify({
+            "year": year,
+            "month": month,
+            "categories": categories,
+            "total_unbudgeted": total_unbudgeted,
+            "count": len(categories)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching unbudgeted categories: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/budget/<int:year>/<int:month>/add-category', methods=['POST'])
+def add_budget_category(year: int, month: int):
+    """Add a category to the monthly budget"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        category_name = data.get('category')
+        subcategory_name = data.get('subcategory')
+        budgeted_amount = data.get('budgeted_amount', 0.0)
+        budget_type = data.get('budget_type', 'expense')
+        
+        if not category_name:
+            return jsonify({"error": "Category name is required"}), 400
+        
+        conn = get_db_connection()
+        
+        # Get the monthly budget ID
+        monthly_budget = conn.execute('''
+            SELECT id FROM monthly_budgets 
+            WHERE budget_year = ? AND budget_month = ?
+        ''', (year, month)).fetchone()
+        
+        if not monthly_budget:
+            return jsonify({"error": f"No budget found for {year}-{month:02d}"}), 404
+        
+        monthly_budget_id = monthly_budget['id']
+        
+        # Get or create category
+        category = conn.execute('SELECT id FROM categories WHERE name = ?', (category_name,)).fetchone()
+        if not category:
+            cursor = conn.execute('INSERT INTO categories (name) VALUES (?)', (category_name,))
+            category_id = cursor.lastrowid
+        else:
+            category_id = category['id']
+        
+        # Get or create subcategory if provided
+        subcategory_id = None
+        if subcategory_name:
+            subcategory = conn.execute('''
+                SELECT id FROM subcategories 
+                WHERE name = ? AND category_id = ?
+            ''', (subcategory_name, category_id)).fetchone()
+            
+            if not subcategory:
+                cursor = conn.execute('''
+                    INSERT INTO subcategories (name, category_id) 
+                    VALUES (?, ?)
+                ''', (subcategory_name, category_id))
+                subcategory_id = cursor.lastrowid
+            else:
+                subcategory_id = subcategory['id']
+        
+        # Check if budget item already exists
+        existing = conn.execute('''
+            SELECT id FROM monthly_budget_items 
+            WHERE monthly_budget_id = ? AND category_id = ? 
+            AND (subcategory_id = ? OR (subcategory_id IS NULL AND ? IS NULL))
+        ''', (monthly_budget_id, category_id, subcategory_id, subcategory_id)).fetchone()
+        
+        if existing:
+            return jsonify({"error": "Budget item already exists for this category/subcategory"}), 409
+        
+        # Add the budget item
+        cursor = conn.execute('''
+            INSERT INTO monthly_budget_items 
+            (monthly_budget_id, category_id, subcategory_id, budgeted_amount, budget_type)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (monthly_budget_id, category_id, subcategory_id, budgeted_amount, budget_type))
+        
+        new_item_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Added {category_name}" + (f" - {subcategory_name}" if subcategory_name else "") + f" to {year}-{month:02d} budget",
+            "item_id": new_item_id,
+            "category": category_name,
+            "subcategory": subcategory_name,
+            "budgeted_amount": budgeted_amount,
+            "budget_type": budget_type
+        })
+        
+    except Exception as e:
+        logger.error(f"Error adding budget category: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/budget/<int:year>/<int:month>/remove-category', methods=['DELETE'])
+def remove_budget_category(year: int, month: int):
+    """Remove a category from the monthly budget"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        category_name = data.get('category')
+        subcategory_name = data.get('subcategory')
+        
+        if not category_name:
+            return jsonify({"error": "Category name is required"}), 400
+        
+        conn = get_db_connection()
+        
+        # Get the monthly budget ID
+        monthly_budget = conn.execute('''
+            SELECT id FROM monthly_budgets 
+            WHERE budget_year = ? AND budget_month = ?
+        ''', (year, month)).fetchone()
+        
+        if not monthly_budget:
+            return jsonify({"error": f"No budget found for {year}-{month:02d}"}), 404
+        
+        monthly_budget_id = monthly_budget['id']
+        
+        # Get category ID
+        category = conn.execute('SELECT id FROM categories WHERE name = ?', (category_name,)).fetchone()
+        if not category:
+            return jsonify({"error": f"Category '{category_name}' not found"}), 404
+        
+        category_id = category['id']
+        
+        # Get subcategory ID if provided
+        subcategory_id = None
+        if subcategory_name:
+            subcategory = conn.execute('''
+                SELECT id FROM subcategories 
+                WHERE name = ? AND category_id = ?
+            ''', (subcategory_name, category_id)).fetchone()
+            
+            if not subcategory:
+                return jsonify({"error": f"Subcategory '{subcategory_name}' not found"}), 404
+            
+            subcategory_id = subcategory['id']
+        
+        # Find and delete the budget item
+        budget_item = conn.execute('''
+            SELECT id, budgeted_amount FROM monthly_budget_items 
+            WHERE monthly_budget_id = ? AND category_id = ? 
+            AND (subcategory_id = ? OR (subcategory_id IS NULL AND ? IS NULL))
+        ''', (monthly_budget_id, category_id, subcategory_id, subcategory_id)).fetchone()
+        
+        if not budget_item:
+            return jsonify({"error": "Budget item not found for this category/subcategory"}), 404
+        
+        # Delete the budget item
+        conn.execute('''
+            DELETE FROM monthly_budget_items WHERE id = ?
+        ''', (budget_item['id'],))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Removed {category_name}" + (f" - {subcategory_name}" if subcategory_name else "") + f" from {year}-{month:02d} budget",
+            "removed_amount": float(budget_item['budgeted_amount'])
+        })
+        
+    except Exception as e:
+        logger.error(f"Error removing budget category: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/budget/available-months', methods=['GET'])
 def get_available_budget_months():
     """Get list of all available budget months for pagination"""
@@ -804,26 +1117,48 @@ def detect_recurring_patterns():
         
         # Convert patterns to API-friendly format
         api_patterns = []
-        for pattern in patterns:
-            confidence_pct = pattern['confidence'] * 100
-            api_pattern = {
-                'pattern_name': pattern['pattern_name'],
-                'account_number': pattern['account_number'],
-                'payee': pattern['payee'],
-                'typical_amount': float(pattern['typical_amount']),
-                'amount_variance': float(pattern.get('amount_variance', 0)),
-                'frequency_type': pattern['frequency_type'],
-                'frequency_interval': pattern.get('frequency_interval', 1),
-                'next_expected_date': pattern['next_expected_date'],
-                'last_occurrence_date': pattern['last_occurrence_date'],
-                'confidence': round(confidence_pct, 1),
-                'confidence_level': _get_confidence_level(pattern['confidence']),
-                'occurrence_count': pattern['occurrence_count'],
-                'pattern_type': pattern.get('pattern_type', 'unknown'),
-                'category_id': pattern.get('category_id'),
-                'subcategory_id': pattern.get('subcategory_id')
-            }
-            api_patterns.append(api_pattern)
+        conn = get_db_connection()
+        
+        try:
+            for pattern in patterns:
+                confidence_pct = pattern['confidence'] * 100
+                
+                # Fetch category and subcategory names if IDs exist
+                category_name = None
+                subcategory_name = None
+                if pattern.get('category_id'):
+                    category_result = conn.execute('SELECT name FROM categories WHERE id = ?', 
+                                                    (pattern['category_id'],)).fetchone()
+                    if category_result:
+                        category_name = category_result['name']
+                if pattern.get('subcategory_id'):
+                    subcat_result = conn.execute('SELECT name FROM subcategories WHERE id = ?', 
+                                                (pattern['subcategory_id'],)).fetchone()
+                    if subcat_result:
+                        subcategory_name = subcat_result['name']
+                
+                api_pattern = {
+                    'pattern_name': pattern['pattern_name'],
+                    'account_number': pattern['account_number'],
+                    'payee': pattern['payee'],
+                    'typical_amount': float(pattern['typical_amount']),
+                    'amount_variance': float(pattern.get('amount_variance', 0)),
+                    'frequency_type': pattern['frequency_type'],
+                    'frequency_interval': pattern.get('frequency_interval', 1),
+                    'next_expected_date': pattern['next_expected_date'],
+                    'last_occurrence_date': pattern['last_occurrence_date'],
+                    'confidence': round(confidence_pct, 1),
+                    'confidence_level': _get_confidence_level(pattern['confidence']),
+                    'occurrence_count': pattern['occurrence_count'],
+                    'pattern_type': pattern.get('pattern_type', 'unknown'),
+                    'category_id': pattern.get('category_id'),
+                    'subcategory_id': pattern.get('subcategory_id'),
+                    'category': category_name,
+                    'subcategory': subcategory_name
+                }
+                api_patterns.append(api_pattern)
+        finally:
+            conn.close()
         
         return jsonify({
             'patterns': api_patterns,
@@ -931,8 +1266,8 @@ def save_recurring_pattern():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/recurring-patterns/<int:pattern_id>', methods=['PUT'])
-def update_recurring_pattern():
-    """Update a recurring pattern (mainly for activating/deactivating)"""
+def update_recurring_pattern(pattern_id):
+    """Update a recurring pattern with comprehensive field support"""
     try:
         data = request.get_json()
         
@@ -942,13 +1277,8 @@ def update_recurring_pattern():
         from database import TransactionDB
         db = TransactionDB()
         
-        # For now, only support activate/deactivate
-        if 'is_active' in data and not data['is_active']:
-            success = db.deactivate_pattern(pattern_id)
-        elif 'next_expected_date' in data:
-            success = db.update_pattern_next_date(pattern_id, data['next_expected_date'])
-        else:
-            return jsonify({"error": "Invalid update operation"}), 400
+        # Use the new comprehensive update method
+        success = db.update_pattern(pattern_id, data)
         
         if success:
             return jsonify({
@@ -956,7 +1286,7 @@ def update_recurring_pattern():
                 'message': 'Pattern updated successfully'
             })
         else:
-            return jsonify({"error": "Failed to update pattern"}), 500
+            return jsonify({"error": "Failed to update pattern or no changes made"}), 500
         
     except Exception as e:
         logger.error(f"Error updating recurring pattern: {e}")
