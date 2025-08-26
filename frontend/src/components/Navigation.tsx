@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, CreditCard } from 'lucide-react';
+import { BarChart3, CreditCard, Users } from 'lucide-react';
 
 const Navigation: React.FC = () => {
   const location = useLocation();
@@ -8,6 +8,7 @@ const Navigation: React.FC = () => {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: BarChart3 },
     { path: '/transactions', label: 'Transactions', icon: CreditCard },
+    { path: '/payees', label: 'Payees', icon: Users },
   ];
 
   return (

@@ -82,6 +82,18 @@ const RecurringPatterns: React.FC = () => {
   // Edit pattern state
   const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
   const [editForm, setEditForm] = useState<Partial<Pattern>>({});
+  
+  // Estimated pattern creation state
+  const [showEstimatedModal, setShowEstimatedModal] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [estimatedForm, setEstimatedForm] = useState({
+    category: '',
+    subcategory: '',
+    frequency: 'biweekly',
+    lookbackDays: 120
+  });
+  const [categoryStats, setCategoryStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Load saved patterns on component mount
   useEffect(() => {
@@ -89,6 +101,13 @@ const RecurringPatterns: React.FC = () => {
       loadSavedPatterns();
     }
   }, [view]);
+  
+  // Load available categories when modal opens
+  useEffect(() => {
+    if (showEstimatedModal) {
+      loadAvailableCategories();
+    }
+  }, [showEstimatedModal]);
 
   const loadSavedPatterns = async () => {
     setLoading(true);
@@ -313,6 +332,112 @@ const RecurringPatterns: React.FC = () => {
       setLoading(false);
     }
   };
+  
+  const loadAvailableCategories = async () => {
+    try {
+      const response = await fetch('/api/categories');
+      if (response.ok) {
+        const data = await response.json();
+        // API returns categories as objects with id and name, extract just the names
+        const categoryNames = data.categories.map((cat: any) => cat.name);
+        setAvailableCategories(categoryNames);
+      }
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+    }
+  };
+  
+  const computeCategoryStats = async () => {
+    if (!estimatedForm.category) {
+      setError('Please select a category first');
+      return;
+    }
+    
+    setStatsLoading(true);
+    setCategoryStats(null);
+    setError(null);
+    
+    try {
+      const params = new URLSearchParams({
+        category: estimatedForm.category,
+        subcategory: estimatedForm.subcategory || '',
+        frequency: estimatedForm.frequency,
+        lookback_days: estimatedForm.lookbackDays.toString()
+      });
+      
+      const url = `/api/category-spending-analysis?${params}`;
+      console.log('Calling API:', url);
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Failed to compute category statistics: ${response.status} ${response.statusText}. ${errorData.error || ''}`);
+      }
+      
+      const data = await response.json();
+      setCategoryStats(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to compute statistics');
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+  
+  const createEstimatedPattern = async () => {
+    if (!categoryStats) {
+      setError('Please compute statistics first');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // Calculate dates based on frequency
+      const frequencyDays = {
+        'weekly': 7,
+        'biweekly': 14,
+        'monthly': 30
+      };
+      const daysToNext = frequencyDays[estimatedForm.frequency as keyof typeof frequencyDays] || 14;
+      
+      const nextDate = new Date(Date.now() + daysToNext * 24 * 60 * 60 * 1000);
+      const lastDate = new Date(Date.now() - daysToNext * 24 * 60 * 60 * 1000);
+      
+      const patternData = {
+        pattern_name: `${estimatedForm.category} (Estimated)`,
+        account_number: 'Z06431462', // Primary account for estimated patterns
+        payee: `${estimatedForm.category} Spending Estimate`,
+        typical_amount: categoryStats.mean,
+        amount_variance: categoryStats.std_dev,
+        frequency_type: estimatedForm.frequency,
+        frequency_interval: 1,
+        next_expected_date: nextDate.toISOString().split('T')[0],
+        last_occurrence_date: lastDate.toISOString().split('T')[0],
+        confidence: Math.max(30, Math.min(80, 100 - categoryStats.cv * 100)) / 100, // Convert to 0-1 range
+        occurrence_count: categoryStats.periods.filter((p: any) => p.total > 0).length,
+        pattern_type: 'estimated'
+      };
+      
+      const response = await fetch('/api/recurring-patterns/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(patternData),
+      });
+      
+      if (!response.ok) throw new Error('Failed to create estimated pattern');
+      
+      // Close modal and refresh patterns
+      setShowEstimatedModal(false);
+      setEstimatedForm({ category: '', subcategory: '', frequency: 'biweekly', lookbackDays: 120 });
+      setCategoryStats(null);
+      loadSavedPatterns();
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create estimated pattern');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const calculateProjection = async () => {
     setLoading(true);
@@ -366,25 +491,36 @@ const RecurringPatterns: React.FC = () => {
         <h1>Recurring Patterns</h1>
         <p>Manage recurring transactions for accurate balance projections</p>
         
-        <div className={styles['view-toggle']}>
-          <button 
-            className={view === 'saved' ? styles.active : ''} 
-            onClick={() => setView('saved')}
-          >
-            Saved Patterns ({savedPatterns.length})
-          </button>
-          <button 
-            className={view === 'detect' ? styles.active : ''} 
-            onClick={() => setView('detect')}
-          >
-            Detect New Patterns
-          </button>
-          <button 
-            className={view === 'projection' ? styles.active : ''} 
-            onClick={() => setView('projection')}
-          >
-            Balance Projection
-          </button>
+        <div className={styles['header-controls']}>
+          <div className={styles['view-toggle']}>
+            <button 
+              className={view === 'saved' ? styles.active : ''} 
+              onClick={() => setView('saved')}
+            >
+              Saved Patterns ({savedPatterns.length})
+            </button>
+            <button 
+              className={view === 'detect' ? styles.active : ''} 
+              onClick={() => setView('detect')}
+            >
+              Detect New Patterns
+            </button>
+            <button 
+              className={view === 'projection' ? styles.active : ''} 
+              onClick={() => setView('projection')}
+            >
+              Balance Projection
+            </button>
+          </div>
+          
+          <div className={styles['header-actions']}>
+            <button 
+              onClick={() => setShowEstimatedModal(true)}
+              className={styles['create-estimated-button']}
+            >
+              Insert Placeholder Pattern
+            </button>
+          </div>
         </div>
       </div>
 
@@ -681,39 +817,41 @@ const RecurringPatterns: React.FC = () => {
 
           {balanceProjection && (
             <div className={styles['projection-results']}>
-              <div className={styles['projection-summary']}>
-                <div className={styles['summary-card']}>
-                  <h3>Starting Balance</h3>
-                  <div className={styles['amount']}>${balanceProjection.starting_balance.toLocaleString()}</div>
-                </div>
-                <div className={styles['summary-card']}>
-                  <h3>Final Balance ({projectionDays} days)</h3>
-                  <div className={`${styles['amount']} ${balanceProjection.total_change >= 0 ? styles.positive : styles.negative}`}>
-                    ${balanceProjection.final_balance.toLocaleString()}
-                  </div>
-                </div>
-                <div className={styles['summary-card']}>
-                  <h3>Total Change</h3>
-                  <div className={`${styles['amount']} ${balanceProjection.total_change >= 0 ? styles.positive : styles.negative}`}>
-                    {balanceProjection.total_change >= 0 ? '+' : ''}${balanceProjection.total_change.toLocaleString()}
-                  </div>
-                </div>
-                <div className={styles['summary-card']}>
-                  <h3>Projected Income</h3>
-                  <div className={`${styles['amount']} ${styles.positive}`}>
-                    +${balanceProjection.projected_income.toLocaleString()}
-                  </div>
-                </div>
-                <div className={styles['summary-card']}>
-                  <h3>Projected Expenses</h3>
-                  <div className={`${styles['amount']} ${styles.negative}`}>
-                    -${balanceProjection.projected_expenses.toLocaleString()}
-                  </div>
-                </div>
-                <div className={styles['summary-card']}>
-                  <h3>Patterns Used</h3>
-                  <div className={styles['count']}>{balanceProjection.patterns_used} patterns</div>
-                </div>
+              <div className={styles['projection-summary-table']}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Starting Balance</th>
+                      <th>Final Balance ({projectionDays} days)</th>
+                      <th>Projected Income</th>
+                      <th>Projected Expenses</th>
+                      <th>Net Cash Flow</th>
+                      <th>Active Patterns</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className={styles['metric-value']}>
+                        ${balanceProjection.starting_balance.toLocaleString()}
+                      </td>
+                      <td className={`${styles['metric-value']} ${balanceProjection.total_change >= 0 ? styles.positive : styles.negative}`}>
+                        ${balanceProjection.final_balance.toLocaleString()}
+                      </td>
+                      <td className={`${styles['metric-value']} ${styles.positive}`}>
+                        +${balanceProjection.projected_income.toLocaleString()}
+                      </td>
+                      <td className={`${styles['metric-value']} ${styles.negative}`}>
+                        -${balanceProjection.projected_expenses.toLocaleString()}
+                      </td>
+                      <td className={`${styles['metric-value']} ${(balanceProjection.projected_income - balanceProjection.projected_expenses) >= 0 ? styles.positive : styles.negative}`}>
+                        {(balanceProjection.projected_income - balanceProjection.projected_expenses) >= 0 ? '+' : ''}${(balanceProjection.projected_income - balanceProjection.projected_expenses).toLocaleString()}
+                      </td>
+                      <td className={styles['metric-value']}>
+                        {balanceProjection.patterns_used} patterns
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
               <div className={styles['balance-chart']}>
@@ -727,7 +865,12 @@ const RecurringPatterns: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis 
                         dataKey="date" 
-                        tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        tickFormatter={(date) => {
+                          // Parse YYYY-MM-DD string explicitly to avoid timezone conversion
+                          const [year, month, day] = date.split('-').map(Number);
+                          const parsedDate = new Date(year, month - 1, day);
+                          return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        }}
                         stroke="#6b7280"
                         fontSize={12}
                       />
@@ -744,11 +887,16 @@ const RecurringPatterns: React.FC = () => {
                               <div className={styles['recharts-tooltip']}>
                                 <div className={styles['tooltip-content']}>
                                   <div className={styles['tooltip-date']}>
-                                    {new Date(label).toLocaleDateString('en-US', { 
-                                      weekday: 'short', 
-                                      month: 'short', 
-                                      day: 'numeric' 
-                                    })}
+                                    {(() => {
+                                      // Parse YYYY-MM-DD string explicitly to avoid timezone conversion
+                                      const [year, month, day] = String(label).split('-').map(Number);
+                                      const date = new Date(year, month - 1, day);
+                                      return date.toLocaleDateString('en-US', { 
+                                        weekday: 'short', 
+                                        month: 'short', 
+                                        day: 'numeric' 
+                                      });
+                                    })()}
                                   </div>
                                   <div className={styles['tooltip-balance']}>
                                     Balance: ${data.balance.toLocaleString()}
@@ -786,26 +934,56 @@ const RecurringPatterns: React.FC = () => {
                         activeDot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: 'white' }}
                       />
                       
-                      {/* Add dots for days with transactions */}
+                      {/* Add markers for days with transactions */}
                       {balanceProjection.daily_projections
                         .filter(d => d.projected_transactions.length > 0)
                         .filter((_, i) => i % Math.max(1, Math.ceil(balanceProjection.daily_projections.filter(d => d.projected_transactions.length > 0).length / 50)) === 0)
                         .map((day, i) => {
                           const netAmount = day.projected_transactions.reduce((sum, tx) => sum + tx.amount, 0);
                           const isIncome = netAmount > 0;
-                          const markerColor = isIncome ? '#10b981' : '#ef4444';
-                          
-                          return (
-                            <ReferenceDot
-                              key={`${day.date}-${i}`}
-                              x={day.date}
-                              y={day.balance}
-                              r={4}
-                              fill={markerColor}
-                              stroke="white"
-                              strokeWidth={2}
-                            />
+                          const hasEstimatedPattern = day.projected_transactions.some(tx => 
+                            tx.pattern_name && tx.pattern_name.includes('(Estimated)')
                           );
+                          
+                          if (hasEstimatedPattern) {
+                            // Blue triangle for estimated patterns
+                            return (
+                              <ReferenceDot
+                                key={`${day.date}-${i}`}
+                                x={day.date}
+                                y={day.balance}
+                                r={6}
+                                fill="#3b82f6"
+                                stroke="white"
+                                strokeWidth={2}
+                                shape={(props: any) => {
+                                  const { cx, cy } = props;
+                                  return (
+                                    <polygon
+                                      points={`${cx},${cy-6} ${cx+5},${cy+4} ${cx-5},${cy+4}`}
+                                      fill="#3b82f6"
+                                      stroke="white"
+                                      strokeWidth={2}
+                                    />
+                                  );
+                                }}
+                              />
+                            );
+                          } else {
+                            // Regular colored dots for detected patterns
+                            const markerColor = isIncome ? '#10b981' : '#ef4444';
+                            return (
+                              <ReferenceDot
+                                key={`${day.date}-${i}`}
+                                x={day.date}
+                                y={day.balance}
+                                r={4}
+                                fill={markerColor}
+                                stroke="white"
+                                strokeWidth={2}
+                              />
+                            );
+                          }
                         })
                       }
                     </LineChart>
@@ -815,35 +993,248 @@ const RecurringPatterns: React.FC = () => {
 
               <div className={styles['upcoming-transactions']}>
                 <h3>Upcoming Projected Transactions</h3>
-                <div className={styles['transactions-list']}>
-                  {balanceProjection.daily_projections
-                    .filter(day => day.projected_transactions.length > 0)
-                    .slice(0, 10)
-                    .map((day, dayIndex) => (
-                      <div key={dayIndex} className={styles['transaction-day']}>
-                        <div className={styles['transaction-date']}>{new Date(day.date).toLocaleDateString()}</div>
-                        <div className={styles['day-transactions']}>
-                          {day.projected_transactions.map((tx, txIndex) => (
-                            <div key={txIndex} className={styles['projected-transaction']}>
-                              <div className={styles['transaction-info']}>
-                                <div className={styles['transaction-name']}>{tx.pattern_name}</div>
-                                <div className={styles['transaction-payee']}>{tx.payee}</div>
-                              </div>
-                              <div className={styles['transaction-details']}>
-                                <div className={`${styles['transaction-amount']} ${tx.amount >= 0 ? styles.positive : styles.negative}`}>
-                                  {tx.amount >= 0 ? '+' : ''}${Math.abs(tx.amount).toFixed(2)}
-                                </div>
-                                <div className={styles['transaction-confidence']}>{tx.confidence}%</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                <div className={styles['transactions-table']}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Pattern Name</th>
+                        <th>Payee</th>
+                        <th>Amount</th>
+                        <th>Type</th>
+                        <th>Confidence</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {balanceProjection.daily_projections
+                        .filter(day => day.projected_transactions.length > 0)
+                        .slice(0, 15)
+                        .flatMap(day => 
+                          day.projected_transactions.map(tx => ({
+                            date: day.date,
+                            ...tx
+                          }))
+                        )
+                        .map((tx, index) => (
+                          <tr key={index}>
+                            <td className={styles['transaction-date-cell']}>
+                              {(() => {
+                                // Parse YYYY-MM-DD string explicitly to avoid timezone conversion
+                                const [year, month, day] = tx.date.split('-').map(Number);
+                                const date = new Date(year, month - 1, day);
+                                return date.toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                                });
+                              })()}
+                            </td>
+                            <td className={styles['pattern-name-cell']}>
+                              <div className={styles['pattern-name-main']}>{tx.pattern_name}</div>
+                              {tx.pattern_name?.includes('(Estimated)') && (
+                                <span className={styles['estimated-badge']}>Estimated</span>
+                              )}
+                            </td>
+                            <td className={styles['payee-cell']}>{tx.payee}</td>
+                            <td className={`${styles['amount-cell']} ${tx.amount >= 0 ? styles.positive : styles.negative}`}>
+                              {tx.amount >= 0 ? '+' : ''}${Math.abs(tx.amount).toFixed(2)}
+                            </td>
+                            <td className={styles['type-cell']}>
+                              <span className={`${styles['type-badge']} ${tx.amount >= 0 ? styles.income : styles.expense}`}>
+                                {tx.amount >= 0 ? 'Income' : 'Expense'}
+                              </span>
+                            </td>
+                            <td className={styles['confidence-cell']}>
+                              <span className={styles['confidence-badge']}>{tx.confidence}%</span>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Estimated Pattern Creation Modal */}
+      {showEstimatedModal && (
+        <div className={styles['modal-overlay']}>
+          <div className={styles['modal-content']}>
+            <div className={styles['modal-header']}>
+              <h2>Create Estimated Pattern</h2>
+              <button 
+                onClick={() => {
+                  setShowEstimatedModal(false);
+                  setCategoryStats(null);
+                  setEstimatedForm({ category: '', subcategory: '', frequency: 'biweekly', lookbackDays: 120 });
+                }}
+                className={styles['modal-close']}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className={styles['modal-body']}>
+              <div className={styles['form-section']}>
+                <h3>Pattern Configuration</h3>
+                
+                <div className={styles['form-row']}>
+                  <div className={styles['form-group']}>
+                    <label>Category:</label>
+                    <select 
+                      value={estimatedForm.category}
+                      onChange={(e) => {
+                        setEstimatedForm({...estimatedForm, category: e.target.value});
+                        setCategoryStats(null); // Clear stats when category changes
+                      }}
+                      className={styles['form-select']}
+                    >
+                      <option value="">Select Category</option>
+                      {availableCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className={styles['form-group']}>
+                    <label>Subcategory (Optional):</label>
+                    <input 
+                      type="text"
+                      value={estimatedForm.subcategory}
+                      onChange={(e) => {
+                        setEstimatedForm({...estimatedForm, subcategory: e.target.value});
+                        setCategoryStats(null);
+                      }}
+                      className={styles['form-input']}
+                      placeholder="Leave blank for all subcategories"
+                    />
+                  </div>
+                </div>
+                
+                <div className={styles['form-row']}>
+                  <div className={styles['form-group']}>
+                    <label>Frequency:</label>
+                    <select 
+                      value={estimatedForm.frequency}
+                      onChange={(e) => {
+                        setEstimatedForm({...estimatedForm, frequency: e.target.value});
+                        setCategoryStats(null);
+                      }}
+                      className={styles['form-select']}
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="biweekly">Biweekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  
+                  <div className={styles['form-group']}>
+                    <label>Lookback Days:</label>
+                    <input 
+                      type="number"
+                      value={estimatedForm.lookbackDays}
+                      onChange={(e) => {
+                        setEstimatedForm({...estimatedForm, lookbackDays: parseInt(e.target.value)});
+                        setCategoryStats(null);
+                      }}
+                      className={styles['form-input']}
+                      min="30"
+                      max="365"
+                      step="30"
+                    />
+                  </div>
+                </div>
+                
+                <div className={styles['compute-section']}>
+                  <button 
+                    onClick={computeCategoryStats}
+                    disabled={!estimatedForm.category || statsLoading}
+                    className={styles['compute-button']}
+                  >
+                    {statsLoading ? 'Computing...' : 'Compute Statistics'}
+                  </button>
+                </div>
+              </div>
+              
+              {categoryStats && (
+                <div className={styles['stats-section']}>
+                  <h3>Statistical Analysis</h3>
+                  
+                  <div className={styles['stats-grid']}>
+                    <div className={styles['stat-card']}>
+                      <div className={styles['stat-label']}>Average per {estimatedForm.frequency}</div>
+                      <div className={styles['stat-value']}>${categoryStats.mean.toFixed(2)}</div>
+                    </div>
+                    
+                    <div className={styles['stat-card']}>
+                      <div className={styles['stat-label']}>Standard Deviation</div>
+                      <div className={styles['stat-value']}>${categoryStats.std_dev.toFixed(2)}</div>
+                    </div>
+                    
+                    <div className={styles['stat-card']}>
+                      <div className={styles['stat-label']}>Coefficient of Variation</div>
+                      <div className={styles['stat-value']}>{(categoryStats.cv * 100).toFixed(1)}%</div>
+                    </div>
+                    
+                    <div className={styles['stat-card']}>
+                      <div className={styles['stat-label']}>Range</div>
+                      <div className={styles['stat-value']}>${categoryStats.min.toFixed(2)} - ${categoryStats.max.toFixed(2)}</div>
+                    </div>
+                  </div>
+                  
+                  <div className={styles['predictability-section']}>
+                    <div className={styles['predictability-rating']}>
+                      <strong>Predictability: {categoryStats.predictability_rating}</strong>
+                    </div>
+                    <div className={styles['confidence-info']}>
+                      Suggested confidence: {Math.max(30, Math.min(80, 100 - categoryStats.cv * 100)).toFixed(0)}%
+                    </div>
+                  </div>
+                  
+                  <div className={styles['period-breakdown']}>
+                    <h4>Period Breakdown:</h4>
+                    <div className={styles['periods-list']}>
+                      {categoryStats.periods.map((period: any, index: number) => (
+                        <div key={index} className={styles['period-item']}>
+                          <span className={styles['period-dates']}>
+                            {period.start} - {period.end}
+                          </span>
+                          <span className={styles['period-amount']}>
+                            ${period.total.toFixed(2)}
+                          </span>
+                          <span className={`${styles['period-deviation']} ${period.deviation >= 0 ? styles.positive : styles.negative}`}>
+                            {period.deviation >= 0 ? '+' : ''}{period.deviation.toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className={styles['modal-footer']}>
+              <button 
+                onClick={() => {
+                  setShowEstimatedModal(false);
+                  setCategoryStats(null);
+                  setEstimatedForm({ category: '', subcategory: '', frequency: 'biweekly', lookbackDays: 120 });
+                }}
+                className={styles['cancel-button']}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={createEstimatedPattern}
+                disabled={!categoryStats || loading}
+                className={styles['create-button']}
+              >
+                {loading ? 'Creating...' : 'Create Pattern'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

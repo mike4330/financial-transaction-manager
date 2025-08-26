@@ -292,29 +292,36 @@ GROUP BY bt.id, bt.name;
 5. **Multi-Account Budgets**: Budget across different accounts
 6. **Budget Alerts**: Notifications when approaching limits
 
-### API Endpoints (Planned)
-- `GET /api/budget/templates` - List all budget templates
-- `POST /api/budget/templates` - Create new budget template
-- `GET /api/budget/monthly/{year}/{month}` - Get monthly budget
-- `POST /api/budget/monthly/{year}/{month}/instantiate` - Create monthly budget from template
-- `PUT /api/budget/items/{id}/actual` - Update actual amounts
-- `GET /api/budget/variance/{year}/{month}` - Get variance report
-- `POST /api/budget/adjustments` - Record budget adjustment
+### API Endpoints (✅ Implemented)
+- `GET /api/budget/<year>/<month>` - Get monthly budget with items and totals
+- `POST /api/budget/<year>/<month>/update-actuals` - Refresh actual amounts from transactions  
+- `PUT /api/budget/items/<id>` - Update budgeted amounts
+- `GET /api/budget/items/<id>/auto-calculate` - Calculate historical averages
+- `POST /api/budget/create-next-month` - Create monthly budget from default template
+- `POST /api/budget/<year>/<month>/add-category` - Add category to existing budget
+- `DELETE /api/budget/<year>/<month>/remove-category` - Remove category from budget
+- `GET /api/budget/available-months` - List all available budget months
+- `GET /api/budget/<year>/<month>/spending-by-category` - Category spending breakdown
+- `GET /api/budget/<year>/<month>/unbudgeted-categories` - Find unbudgeted spending categories
 
-### Frontend Components (Planned)
-- **Budget Template Manager**: Create and edit budget templates
-- **Monthly Budget Dashboard**: View current month's budget vs actual
-- **Variance Analysis Charts**: Visual budget performance tracking
-- **Category Selection Interface**: Choose which categories to budget
-- **Budget Adjustment Modal**: Record mid-month changes
+### Frontend Components (✅ Implemented)
+- **Monthly Budget Dashboard**: Complete budget view with actual vs budgeted tracking
+- **Interactive Pie Charts**: Visual spending breakdown by category with percentages
+- **Inline Budget Editing**: Click-to-edit amounts with accept/cancel/auto controls
+- **Auto-Calculate Feature**: Historical average calculation with confidence scoring
+- **Category Management**: Add/remove categories from monthly budgets dynamically
+- **Budget Navigation**: Month-by-month navigation with available budget detection
+- **Unbudgeted Detection**: Automatic identification of spending without budget allocation
+- **Real-time Totals**: Live income/expense/net total calculation during editing
 
 ## Technical Notes
 
-### Migration Strategy
-The budget schema was added to the existing `database.py` `init_database()` method using `CREATE TABLE IF NOT EXISTS` statements. This ensures:
-- **Safe deployment**: No data loss on existing databases
-- **Automatic creation**: New installations get full schema
-- **Incremental updates**: Future schema changes can be added similarly
+### Database Integration
+The budget schema is integrated into the production `database.py` with optimized initialization:
+- **Production optimized**: Removed expensive migration overhead for fast startup
+- **Safe deployment**: Schema creation using `CREATE TABLE IF NOT EXISTS` statements
+- **Automatic creation**: New installations get full budget schema
+- **Performance focused**: Minimal database overhead for established systems
 
 ### Constraint Considerations
 - **Unique constraints**: Prevent duplicate budget items per template/month

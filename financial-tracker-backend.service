@@ -1,0 +1,32 @@
+[Unit]
+Description=Financial Tracker Flask Backend API
+After=network.target
+PartOf=financial-tracker.service
+
+[Service]
+Type=simple
+User=mike
+Group=mike
+WorkingDirectory=/var/www/html/bank
+Environment=PATH=/usr/bin:/usr/local/bin
+Environment=PYTHONPATH=/var/www/html/bank
+ExecStart=/usr/bin/python3 /var/www/html/bank/api_server.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=financial-tracker-backend
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/www/html/bank
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

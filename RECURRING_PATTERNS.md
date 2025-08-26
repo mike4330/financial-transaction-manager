@@ -153,15 +153,42 @@ DELETE /api/recurring-patterns/{pattern_id}
 - `created_at` - Pattern creation timestamp
 - `updated_at` - Last modification timestamp
 
-## Future Balance Projections
+## Balance Projections (✅ Implemented)
 
-Saved patterns are designed to be used by a balance projection engine that:
+The system includes a complete balance projection engine that leverages saved patterns:
 
-1. **Starts with current account balance** (manual input or reconciliation)
-2. **Projects recurring income** (salary, transfers, dividends) 
-3. **Projects recurring expenses** (bills, subscriptions, regular spending)
-4. **Calculates future balance** = current + projected income - projected expenses
-5. **Shows confidence intervals** based on pattern reliability
+### Interactive Balance Chart
+- **SVG-based visualization** with 90-day projections  
+- **Transaction event markers** on days with projected transactions
+- **Rich tooltips** showing transaction details, amounts, and confidence levels
+- **Account-specific focus** on Individual TOD account (Z06431462) for accurate projections
+
+### Multi-Account Pattern Architecture
+The system handles complex money flow patterns:
+```
+Primary Account (Z06431462) → Wife's Account (Z23693697) → Actual Purchases
+```
+
+**Estimated Patterns**: Analyze spending across both accounts but apply projections to primary account
+- Captures true spending velocity (wife's purchasing patterns)  
+- Avoids double-counting in balance projections
+- Blue triangle markers indicate estimated patterns vs detected patterns
+
+### API Integration
+```http
+POST /api/balance-projection
+Content-Type: application/json
+
+{
+  "starting_balance": 10000.0,
+  "projection_days": 90
+}
+```
+
+**Response includes:**
+- Daily balance projections with transaction breakdowns
+- Income/expense totals and net change
+- Pattern-based transaction predictions with confidence scores
 
 ## Development Integration
 
@@ -176,9 +203,9 @@ To extend the detection algorithm:
 
 ### Frontend Components
 
-- **RecurringPatterns.tsx** - Main management interface
-- **RecurringPatterns.module.css** - Component styling
-- **App.simple.tsx** - Navigation integration
+- **RecurringPatterns.tsx** - Main management interface with pattern detection and balance projections
+- **RecurringPatterns.module.css** - Component styling with chart and tooltip support
+- **App.simple.tsx** - Navigation integration with patterns route
 
 ### CLI Commands
 

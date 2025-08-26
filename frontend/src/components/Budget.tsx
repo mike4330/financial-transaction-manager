@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Budget.module.css';
 import { TransactionModal } from './TransactionModal';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import Dialog from './Dialog';
+import ConfirmDialog from './ConfirmDialog';
 
 interface BudgetItem {
   id: string;
@@ -8,7 +11,23 @@ interface BudgetItem {
   subcategory?: string;
   budgeted: number;
   actual: number;
+  expected?: number; // Expected amount from recurring patterns
   type: 'expense' | 'income';
+}
+
+interface PatternProjection {
+  category: string;
+  subcategory?: string;
+  income_projected: number;
+  expense_projected: number;
+  patterns: Array<{
+    pattern_name: string;
+    payee: string;
+    amount: number;
+    type: 'income' | 'expense';
+    frequency: string;
+    occurrences: number;
+  }>;
 }
 
 interface BudgetTotals {
@@ -23,6 +42,28 @@ interface BudgetInfo {
   month: number;
   status: string;
   created_at: string;
+}
+
+interface CategorySpending {
+  category: string;
+  amount: number;
+  percentage: number;
+  transaction_count: number;
+}
+
+interface SpendingData {
+  year: number;
+  month: number;
+  categories: CategorySpending[];
+  total_spending: number;
+}
+
+interface UnbudgetedData {
+  year: number;
+  month: number;
+  categories: CategorySpending[];
+  total_unbudgeted: number;
+  count: number;
 }
 
 const Budget: React.FC = () => {
@@ -43,6 +84,24 @@ const Budget: React.FC = () => {
     endDate: string;
     title: string;
   } | null>(null);
+  const [spendingData, setSpendingData] = useState<SpendingData | null>(null);
+  const [unbudgetedData, setUnbudgetedData] = useState<UnbudgetedData | null>(null);
+  const [addingCategory, setAddingCategory] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', type: 'info' });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    details?: string[];
+    onConfirm: () => void;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'info' });
+  const [patternProjections, setPatternProjections] = useState<PatternProjection[]>([]);
 
   useEffect(() => {
     const fetchAvailableMonths = async () => {
@@ -97,6 +156,27 @@ const Budget: React.FC = () => {
         setTotals(data.totals || null);
         setBudgetInfo(data.budget || null);
         
+        // Fetch spending data for pie chart
+        const spendingResponse = await fetch(`/api/budget/${currentBudget.year}/${currentBudget.month}/spending-by-category`);
+        if (spendingResponse.ok) {
+          const spendingData = await spendingResponse.json();
+          setSpendingData(spendingData);
+        }
+        
+        // Fetch unbudgeted categories data
+        const unbudgetedResponse = await fetch(`/api/budget/${currentBudget.year}/${currentBudget.month}/unbudgeted-categories`);
+        if (unbudgetedResponse.ok) {
+          const unbudgetedData = await unbudgetedResponse.json();
+          setUnbudgetedData(unbudgetedData);
+        }
+
+        // Fetch pattern projections
+        const patternResponse = await fetch(`/api/monthly-pattern-projections?year=${currentBudget.year}&month=${currentBudget.month}`);
+        if (patternResponse.ok) {
+          const patternData = await patternResponse.json();
+          setPatternProjections(patternData.category_projections || []);
+        }
+        
       } catch (err) {
         console.error('Error fetching budget data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load budget data');
@@ -107,6 +187,143 @@ const Budget: React.FC = () => {
 
     fetchBudgetData();
   }, [availableMonths, currentBudgetIndex]);
+
+  // Merge pattern projections with budget items
+  const getBudgetItemsWithProjections = (): BudgetItem[] => {
+    return budgetItems.map(item => {
+      // Find matching pattern projection
+      const projection = patternProjections.find(p => 
+        p.category === item.category && 
+        (p.subcategory === item.subcategory || (!p.subcategory && !item.subcategory))
+      );
+      
+      if (projection) {
+        const expectedAmount = item.type === 'income' ? projection.income_projected : projection.expense_projected;
+        return { ...item, expected: expectedAmount };
+      }
+      
+      return item;
+    });
+  };
+
+  // Refresh all budget data from server
+  const refreshBudgetData = async () => {
+    if (availableMonths.length === 0) return;
+    
+    try {
+      const currentBudget = availableMonths[currentBudgetIndex];
+      if (!currentBudget) return;
+
+      // Refresh budget items and totals
+      const response = await fetch(`/api/budget/${currentBudget.year}/${currentBudget.month}`);
+      if (response.ok) {
+        const data = await response.json();
+        setBudgetItems(data.items || []);
+        setTotals(data.totals || null);
+        setBudgetInfo(data.budget || null);
+      }
+      
+      // Refresh spending data for pie chart
+      const spendingResponse = await fetch(`/api/budget/${currentBudget.year}/${currentBudget.month}/spending-by-category`);
+      if (spendingResponse.ok) {
+        const spendingData = await spendingResponse.json();
+        setSpendingData(spendingData);
+      }
+      
+      // Refresh unbudgeted categories data
+      const unbudgetedResponse = await fetch(`/api/budget/${currentBudget.year}/${currentBudget.month}/unbudgeted-categories`);
+      if (unbudgetedResponse.ok) {
+        const unbudgetedData = await unbudgetedResponse.json();
+        setUnbudgetedData(unbudgetedData);
+      }
+
+      // Refresh pattern projections
+      const patternResponse = await fetch(`/api/monthly-pattern-projections?year=${currentBudget.year}&month=${currentBudget.month}`);
+      if (patternResponse.ok) {
+        const patternData = await patternResponse.json();
+        setPatternProjections(patternData.category_projections || []);
+      }
+    } catch (err) {
+      console.error('Error refreshing budget data:', err);
+    }
+  };
+
+  // Dialog helper functions
+  const showDialog = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setDialog({ isOpen: true, title, message, type });
+  };
+
+  const showConfirmDialog = (
+    title: string, 
+    message: string, 
+    onConfirm: () => void, 
+    type: 'success' | 'error' | 'warning' | 'info' = 'warning',
+    details?: string[]
+  ) => {
+    setConfirmDialog({ isOpen: true, title, message, onConfirm, type, details });
+  };
+
+  // Function to add unbudgeted category to budget
+  const addCategoryToBudget = async (categoryName: string) => {
+    if (!budgetInfo) return;
+    
+    try {
+      setAddingCategory(categoryName);
+      
+      const response = await fetch(`/api/budget/${budgetInfo.year}/${budgetInfo.month}/add-category`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: categoryName,
+          budgeted_amount: 0.0,  // Start with $0, user can edit later
+          budget_type: 'expense'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add category to budget');
+      }
+
+      const result = await response.json();
+      
+      // Refresh budget data to show the new item
+      const currentBudget = availableMonths[currentBudgetIndex];
+      if (currentBudget) {
+        // Refresh budget items
+        const budgetResponse = await fetch(`/api/budget/${currentBudget.year}/${currentBudget.month}`);
+        if (budgetResponse.ok) {
+          const data = await budgetResponse.json();
+          setBudgetItems(data.items || []);
+          setTotals(data.totals || null);
+        }
+        
+        // Refresh unbudgeted categories
+        const unbudgetedResponse = await fetch(`/api/budget/${currentBudget.year}/${currentBudget.month}/unbudgeted-categories`);
+        if (unbudgetedResponse.ok) {
+          const unbudgetedData = await unbudgetedResponse.json();
+          setUnbudgetedData(unbudgetedData);
+        }
+      }
+      
+      // Show success message
+      showDialog(
+        'Category Added',
+        `Successfully added "${categoryName}" to budget. You can now set a budget amount.`,
+        'success'
+      );
+      
+    } catch (err) {
+      console.error('Error adding category to budget:', err);
+      showDialog(
+        'Error Adding Category',
+        `Failed to add category to budget: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        'error'
+      );
+    } finally {
+      setAddingCategory(null);
+    }
+  };
 
   // Format month/year for display
   const formatBudgetPeriod = (budgetInfo: BudgetInfo | null): string => {
@@ -135,7 +352,7 @@ const Budget: React.FC = () => {
   const acceptEdit = async (itemId: string) => {
     const newAmount = parseFloat(editValue);
     if (isNaN(newAmount) || newAmount < 0) {
-      alert('Please enter a valid positive number');
+      showDialog('Invalid Amount', 'Please enter a valid positive number', 'warning');
       return;
     }
 
@@ -152,36 +369,17 @@ const Budget: React.FC = () => {
         throw new Error(errorData.error || 'Failed to update budget item');
       }
 
-      // Update locally
-      setBudgetItems(prev => prev.map(item => 
-        item.id === itemId ? { ...item, budgeted: newAmount } : item
-      ));
-
-      // Update totals locally
-      if (totals) {
-        const item = budgetItems.find(i => i.id === itemId);
-        if (item) {
-          const difference = newAmount - item.budgeted;
-          if (item.type === 'income') {
-            setTotals(prev => prev ? {
-              ...prev,
-              income: { ...prev.income, budgeted: prev.income.budgeted + difference },
-              net: { ...prev.net, budgeted: prev.net.budgeted + difference }
-            } : null);
-          } else {
-            setTotals(prev => prev ? {
-              ...prev,
-              expenses: { ...prev.expenses, budgeted: prev.expenses.budgeted + difference },
-              net: { ...prev.net, budgeted: prev.net.budgeted - difference }
-            } : null);
-          }
-        }
-      }
+      // Refresh all budget data from server to ensure consistency
+      await refreshBudgetData();
 
       cancelEditing();
     } catch (err) {
       console.error('Error updating budget item:', err);
-      alert(`Failed to update budget item: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showDialog(
+        'Update Failed',
+        `Failed to update budget item: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        'error'
+      );
     }
   };
 
@@ -193,7 +391,11 @@ const Budget: React.FC = () => {
       if (!response.ok) {
         const errorData = await response.json();
         if (response.status === 400) {
-          alert(errorData.message || 'Insufficient historical data for auto-calculation');
+          showDialog(
+            'Auto-calculation Not Available',
+            errorData.message || 'Insufficient historical data for auto-calculation',
+            'warning'
+          );
         } else {
           throw new Error(errorData.error || 'Failed to calculate auto amount');
         }
@@ -205,15 +407,17 @@ const Budget: React.FC = () => {
       const analysis = data.analysis;
       
       // Show confirmation dialog with analysis
-      const message = `Auto-calculated amount: $${suggestedAmount.toLocaleString()}\n\n` +
-        `Analysis:\n` +
-        `• Based on ${analysis.months_used} months of data\n` +
-        `• Confidence: ${(data.confidence * 100).toFixed(0)}% (${analysis.confidence_description})\n` +
-        `• Median spending: $${analysis.median.toLocaleString()}\n` +
-        `${analysis.outliers_removed > 0 ? `• Removed ${analysis.outliers_removed} outlier month(s)\n` : ''}` +
-        `\nApply this amount?`;
-      
-      if (confirm(message)) {
+      const details = [
+        `Based on ${analysis.months_used} months of data`,
+        `Confidence: ${(data.confidence * 100).toFixed(0)}% (${analysis.confidence_description})`,
+        `Median spending: $${analysis.median.toLocaleString()}`,
+        ...(analysis.outliers_removed > 0 ? [`Removed ${analysis.outliers_removed} outlier month(s)`] : [])
+      ];
+
+      showConfirmDialog(
+        'Auto-calculated Amount',
+        `Set budget to $${suggestedAmount.toLocaleString()}?`,
+        async () => {
         // Update the edit value and trigger accept
         setEditValue(suggestedAmount.toString());
         
@@ -229,37 +433,21 @@ const Budget: React.FC = () => {
           throw new Error(errorData.error || 'Failed to update budget item');
         }
 
-        // Update locally
-        setBudgetItems(prev => prev.map(item => 
-          item.id === itemId ? { ...item, budgeted: suggestedAmount } : item
-        ));
-
-        // Update totals locally
-        if (totals) {
-          const item = budgetItems.find(i => i.id === itemId);
-          if (item) {
-            const difference = suggestedAmount - item.budgeted;
-            if (item.type === 'income') {
-              setTotals(prev => prev ? {
-                ...prev,
-                income: { ...prev.income, budgeted: prev.income.budgeted + difference },
-                net: { ...prev.net, budgeted: prev.net.budgeted + difference }
-              } : null);
-            } else {
-              setTotals(prev => prev ? {
-                ...prev,
-                expenses: { ...prev.expenses, budgeted: prev.expenses.budgeted + difference },
-                net: { ...prev.net, budgeted: prev.net.budgeted - difference }
-              } : null);
-            }
-          }
-        }
+        // Refresh all budget data from server to ensure consistency
+        await refreshBudgetData();
 
         cancelEditing();
-      }
+        },
+        'info',
+        details
+      );
     } catch (err) {
       console.error('Error with auto-update:', err);
-      alert(`Auto-update failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showDialog(
+        'Auto-update Failed',
+        `Auto-update failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        'error'
+      );
     }
   };
 
@@ -314,7 +502,11 @@ const Budget: React.FC = () => {
       if (!response.ok) {
         const errorData = await response.json();
         if (response.status === 400) {
-          alert(errorData.message || 'Budget already exists for next month');
+          showDialog(
+            'Budget Already Exists',
+            errorData.message || 'Budget already exists for next month',
+            'warning'
+          );
         } else {
           throw new Error(errorData.error || 'Failed to create next month budget');
         }
@@ -322,7 +514,11 @@ const Budget: React.FC = () => {
       }
 
       const data = await response.json();
-      alert(`Successfully created budget for ${data.year}-${data.month.toString().padStart(2, '0')}`);
+      showDialog(
+        'Budget Created',
+        `Successfully created budget for ${data.year}-${data.month.toString().padStart(2, '0')}`,
+        'success'
+      );
       
       // Refresh available months and navigate to the new budget
       const monthsResponse = await fetch('/api/budget/available-months');
@@ -333,7 +529,11 @@ const Budget: React.FC = () => {
       }
     } catch (err) {
       console.error('Error creating next month budget:', err);
-      alert(`Failed to create next month budget: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showDialog(
+        'Budget Creation Failed',
+        `Failed to create next month budget: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        'error'
+      );
     }
   };
 
@@ -426,14 +626,24 @@ const Budget: React.FC = () => {
     }
   };
 
-  // Use totals from API if available, otherwise calculate from items
-  const totalBudgetedExpenses = totals?.expenses.budgeted ?? budgetItems.filter(item => item.type === 'expense').reduce((sum, item) => sum + item.budgeted, 0);
-  const totalActualExpenses = totals?.expenses.actual ?? budgetItems.filter(item => item.type === 'expense').reduce((sum, item) => sum + item.actual, 0);
-  const totalBudgetedIncome = totals?.income.budgeted ?? budgetItems.filter(item => item.type === 'income').reduce((sum, item) => sum + item.budgeted, 0);
-  const totalActualIncome = totals?.income.actual ?? budgetItems.filter(item => item.type === 'income').reduce((sum, item) => sum + item.actual, 0);
+  // Get budget items with pattern projections
+  const budgetItemsWithProjections = getBudgetItemsWithProjections();
 
+  // Calculate totals including expected amounts from recurring patterns
+  const totalBudgetedExpenses = totals?.expenses.budgeted ?? budgetItemsWithProjections.filter(item => item.type === 'expense').reduce((sum, item) => sum + item.budgeted, 0);
+  const totalActualExpenses = totals?.expenses.actual ?? budgetItemsWithProjections.filter(item => item.type === 'expense').reduce((sum, item) => sum + item.actual, 0);
+  const totalExpectedExpenses = budgetItemsWithProjections.filter(item => item.type === 'expense').reduce((sum, item) => sum + (item.expected || 0), 0);
+
+  const totalBudgetedIncome = totals?.income.budgeted ?? budgetItemsWithProjections.filter(item => item.type === 'income').reduce((sum, item) => sum + item.budgeted, 0);
+  const totalActualIncome = totals?.income.actual ?? budgetItemsWithProjections.filter(item => item.type === 'income').reduce((sum, item) => sum + item.actual, 0);
+  const totalExpectedIncome = budgetItemsWithProjections.filter(item => item.type === 'income').reduce((sum, item) => sum + (item.expected || 0), 0);
+  
+  // Use the higher of actual vs expected for display (don't double-count)
+  const totalDisplayIncome = Math.max(totalActualIncome, totalExpectedIncome);
+  const totalDisplayExpenses = Math.max(totalActualExpenses, totalExpectedExpenses);
+  
   // Group items by category
-  const groupedByCategory = budgetItems.reduce((acc, item) => {
+  const groupedByCategory = budgetItemsWithProjections.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
     }
@@ -484,24 +694,152 @@ const Budget: React.FC = () => {
           <div className={styles.summaryCard}>
             <h3>Income</h3>
             <div className={styles.summaryAmount}>
-              <span className={styles.actualAmount}>${totalActualIncome.toLocaleString()}</span>
+              <span className={styles.actualAmount}>
+                ${totalDisplayIncome.toLocaleString()}
+              </span>
+            </div>
+            <div className={styles.summarySubtext}>
+              Budget: ${totalBudgetedIncome.toLocaleString()}
             </div>
           </div>
           <div className={styles.summaryCard}>
             <h3>Expenses</h3>
             <div className={styles.summaryAmount}>
-              <span className={styles.actualAmount}>${totalActualExpenses.toLocaleString()}</span>
+              <span className={styles.actualAmount}>
+                ${totalDisplayExpenses.toLocaleString()}
+              </span>
+            </div>
+            <div className={styles.summarySubtext}>
+              Budget: ${totalBudgetedExpenses.toLocaleString()}
             </div>
           </div>
           <div className={styles.summaryCard}>
             <h3>Net</h3>
             <div className={styles.summaryAmount}>
-              <span className={`${styles.actualAmount} ${(totalActualIncome - totalActualExpenses) >= 0 ? styles.positive : styles.negative}`}>
-                ${(totalActualIncome - totalActualExpenses).toLocaleString()}
+              <span className={`${styles.actualAmount} ${(totalDisplayIncome - totalDisplayExpenses) >= 0 ? styles.positive : styles.negative}`}>
+                ${(totalDisplayIncome - totalDisplayExpenses).toLocaleString()}
               </span>
+            </div>
+            <div className={styles.summarySubtext}>
+              Budget: ${(totalBudgetedIncome - totalBudgetedExpenses).toLocaleString()}
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Charts Row */}
+      <div className={styles.chartsRow}>
+        {/* Spending by Category Pie Chart */}
+        {spendingData && spendingData.categories.length > 0 && (
+          <div className={styles.pieChartSection}>
+            <h3 className={styles.chartTitle}>Spending by Category</h3>
+            <div className={styles.pieChartContainer}>
+              <div className={styles.pieChartWrapper}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={spendingData.categories.slice(0, 8).map(category => ({
+                        name: category.category,
+                        value: category.amount,
+                        percentage: category.percentage,
+                        count: category.transaction_count
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      innerRadius={0}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {spendingData.categories.slice(0, 8).map((entry, index) => {
+                        const colors = [
+                          '#3b82f6', '#ef4444', '#10b981', '#f59e0b', 
+                          '#8b5cf6', '#f97316', '#06b6d4', '#84cc16'
+                        ];
+                        return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                      })}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: number, name: string, props: any) => [
+                        `$${value.toLocaleString()}`,
+                        name,
+                        `${props.payload.percentage.toFixed(1)}% (${props.payload.count} transactions)`
+                      ]}
+                      labelFormatter={(label) => `${label}`}
+                    />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={60}
+                      layout="horizontal"
+                      wrapperStyle={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        justifyContent: 'center',
+                        gap: '16px',
+                        paddingTop: '16px'
+                      }}
+                      formatter={(value, entry) => `${value} ($${entry.payload?.value?.toLocaleString()})`}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Unbudgeted Categories */}
+        {unbudgetedData && (
+          <div className={styles.unbudgetedSection}>
+            <h3 className={styles.chartTitle}>Unbudgeted Categories</h3>
+            <div className={styles.unbudgetedContainer}>
+              {unbudgetedData.categories.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <p className={styles.emptyMessage}>✅ All spending categories are budgeted!</p>
+                </div>
+              ) : (
+                <>
+                  <div className={styles.unbudgetedSummary}>
+                    <div className={styles.totalUnbudgeted}>
+                      <span className={styles.amount}>${unbudgetedData.total_unbudgeted.toLocaleString()}</span>
+                      <span className={styles.label}>Total Unbudgeted</span>
+                    </div>
+                    <div className={styles.categoryCount}>
+                      <span className={styles.count}>{unbudgetedData.count}</span>
+                      <span className={styles.label}>Categories</span>
+                    </div>
+                  </div>
+                  <div className={styles.unbudgetedList}>
+                    {unbudgetedData.categories.slice(0, 6).map((category, index) => (
+                      <div key={category.category} className={styles.unbudgetedItem}>
+                        <div className={styles.categoryInfo}>
+                          <span className={styles.categoryName}>{category.category}</span>
+                          <span className={styles.categoryAmount}>${category.amount.toLocaleString()}</span>
+                        </div>
+                        <div className={styles.categoryDetails}>
+                          <span className={styles.percentage}>{category.percentage.toFixed(1)}%</span>
+                          <span className={styles.transactionCount}>{category.transaction_count} transactions</span>
+                        </div>
+                        <button
+                          onClick={() => addCategoryToBudget(category.category)}
+                          disabled={addingCategory === category.category}
+                          className={styles.addButton}
+                          title={`Add ${category.category} to budget`}
+                        >
+                          {addingCategory === category.category ? '...' : '+'}
+                        </button>
+                      </div>
+                    ))}
+                    {unbudgetedData.categories.length > 6 && (
+                      <div className={styles.moreCategories}>
+                        +{unbudgetedData.categories.length - 6} more categories
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={styles.budgetList}>
@@ -515,9 +853,56 @@ const Budget: React.FC = () => {
                 <div key={item.id} className={styles.subcategoryItem}>
                   <div className={styles.subcategoryHeader}>
                     <span className={styles.subcategoryName}>{item.subcategory}</span>
+                    <div className={styles.progressContainer}>
+                      <div 
+                        className={styles.progressBar}
+                        onClick={() => handleProgressBarClick(item)}
+                        title="Click to view transactions"
+                      >
+                        {/* Actual amount bar */}
+                        <div 
+                          className={`${styles.progressFill} ${styles.actualFill}`}
+                          style={{ 
+                            width: `${Math.min(calculateProgress(item.actual, item.budgeted, item.type), 100)}%`,
+                            backgroundColor: getProgressColor(item.actual, item.budgeted, item.type),
+                            position: 'relative',
+                            zIndex: 2
+                          }}
+                        />
+                        {/* Expected amount bar (if available) */}
+                        {item.expected && item.expected > 0 && (
+                          <div 
+                            className={`${styles.progressFill} ${styles.expectedFill}`}
+                            style={{ 
+                              width: `${Math.min(calculateProgress(item.expected, item.budgeted, item.type), 100)}%`,
+                              backgroundColor: 'rgba(59, 130, 246, 0.3)', // Blue with transparency
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              zIndex: 1
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className={styles.progressInfo}>
+                        <span className={styles.currentAmount}>${item.actual.toLocaleString()}</span>
+                        <span className={styles.separator}>|</span>
+                        {item.expected && item.expected > 0 && (
+                          <>
+                            <span className={styles.expectedAmount} title="Expected from recurring patterns">
+                              ${item.expected.toLocaleString()} exp
+                            </span>
+                            <span className={styles.separator}>|</span>
+                          </>
+                        )}
+                        <span className={styles.budgetAmount}>${item.budgeted.toLocaleString()}</span>
+                        <span className={styles.separator}>|</span>
+                        <span className={styles.variance}>
+                          {getVarianceText(item.actual, item.budgeted, item.type)}
+                        </span>
+                      </div>
+                    </div>
                     <div className={styles.amounts}>
-                      <span className={styles.actualAmount}>${item.actual.toLocaleString()}</span>
-                      <span className={styles.budgetedAmount}>/ </span>
                       {editingItem === item.id ? (
                         <div className={styles.editContainer}>
                           <input
@@ -560,30 +945,6 @@ const Budget: React.FC = () => {
                           ${item.budgeted.toLocaleString()}
                         </span>
                       )}
-                    </div>
-                  </div>
-                  <div className={styles.progressContainer}>
-                    <div 
-                      className={styles.progressBar}
-                      onClick={() => handleProgressBarClick(item)}
-                      title="Click to view transactions"
-                    >
-                      <div 
-                        className={styles.progressFill}
-                        style={{ 
-                          width: `${Math.min(calculateProgress(item.actual, item.budgeted, item.type), 100)}%`,
-                          backgroundColor: getProgressColor(item.actual, item.budgeted, item.type)
-                        }}
-                      />
-                    </div>
-                    <div className={styles.progressInfo}>
-                      <span className={styles.currentAmount}>${item.actual.toLocaleString()}</span>
-                      <span className={styles.separator}>|</span>
-                      <span className={styles.budgetAmount}>${item.budgeted.toLocaleString()}</span>
-                      <span className={styles.separator}>|</span>
-                      <span className={styles.variance}>
-                        {getVarianceText(item.actual, item.budgeted, item.type)}
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -602,9 +963,56 @@ const Budget: React.FC = () => {
                 <div key={item.id} className={styles.subcategoryItem}>
                   <div className={styles.subcategoryHeader}>
                     <span className={styles.subcategoryName}>{item.subcategory}</span>
+                    <div className={styles.progressContainer}>
+                      <div 
+                        className={styles.progressBar}
+                        onClick={() => handleProgressBarClick(item)}
+                        title="Click to view transactions"
+                      >
+                        {/* Actual amount bar */}
+                        <div 
+                          className={`${styles.progressFill} ${styles.actualFill}`}
+                          style={{ 
+                            width: `${Math.min(calculateProgress(item.actual, item.budgeted, item.type), 100)}%`,
+                            backgroundColor: getProgressColor(item.actual, item.budgeted, item.type),
+                            position: 'relative',
+                            zIndex: 2
+                          }}
+                        />
+                        {/* Expected amount bar (if available) */}
+                        {item.expected && item.expected > 0 && (
+                          <div 
+                            className={`${styles.progressFill} ${styles.expectedFill}`}
+                            style={{ 
+                              width: `${Math.min(calculateProgress(item.expected, item.budgeted, item.type), 100)}%`,
+                              backgroundColor: 'rgba(59, 130, 246, 0.3)', // Blue with transparency
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              zIndex: 1
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className={styles.progressInfo}>
+                        <span className={styles.currentAmount}>${item.actual.toLocaleString()}</span>
+                        <span className={styles.separator}>|</span>
+                        {item.expected && item.expected > 0 && (
+                          <>
+                            <span className={styles.expectedAmount} title="Expected from recurring patterns">
+                              ${item.expected.toLocaleString()} exp
+                            </span>
+                            <span className={styles.separator}>|</span>
+                          </>
+                        )}
+                        <span className={styles.budgetAmount}>${item.budgeted.toLocaleString()}</span>
+                        <span className={styles.separator}>|</span>
+                        <span className={styles.variance}>
+                          {getVarianceText(item.actual, item.budgeted, item.type)}
+                        </span>
+                      </div>
+                    </div>
                     <div className={styles.amounts}>
-                      <span className={styles.actualAmount}>${item.actual.toLocaleString()}</span>
-                      <span className={styles.budgetedAmount}>/ </span>
                       {editingItem === item.id ? (
                         <div className={styles.editContainer}>
                           <input
@@ -649,30 +1057,6 @@ const Budget: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <div className={styles.progressContainer}>
-                    <div 
-                      className={styles.progressBar}
-                      onClick={() => handleProgressBarClick(item)}
-                      title="Click to view transactions"
-                    >
-                      <div 
-                        className={styles.progressFill}
-                        style={{ 
-                          width: `${Math.min(calculateProgress(item.actual, item.budgeted, item.type), 100)}%`,
-                          backgroundColor: getProgressColor(item.actual, item.budgeted, item.type)
-                        }}
-                      />
-                    </div>
-                    <div className={styles.progressInfo}>
-                      <span className={styles.currentAmount}>${item.actual.toLocaleString()}</span>
-                      <span className={styles.separator}>|</span>
-                      <span className={styles.budgetAmount}>${item.budgeted.toLocaleString()}</span>
-                      <span className={styles.separator}>|</span>
-                      <span className={styles.variance}>
-                        {getVarianceText(item.actual, item.budgeted, item.type)}
-                      </span>
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
@@ -689,6 +1073,27 @@ const Budget: React.FC = () => {
         startDate={selectedCategory?.startDate}
         endDate={selectedCategory?.endDate}
         title={selectedCategory?.title}
+      />
+      
+      {/* Dialog Components */}
+      <Dialog
+        isOpen={dialog.isOpen}
+        onClose={() => setDialog({ ...dialog, isOpen: false })}
+        title={dialog.title}
+        message={dialog.message}
+        type={dialog.type}
+      />
+      
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        details={confirmDialog.details}
+        type={confirmDialog.type}
+        confirmText="Apply Amount"
+        cancelText="Cancel"
       />
     </div>
   );

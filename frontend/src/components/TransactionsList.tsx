@@ -15,6 +15,7 @@ interface Transaction {
   subcategory: string;
   category_id: number | null;
   subcategory_id: number | null;
+  note: string | null;
 }
 
 interface Category {
@@ -48,6 +49,8 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
     categoryId: number | null;
     subcategoryId: number | null;
   } | null>(null);
+  const [editingNote, setEditingNote] = useState<number | null>(null);
+  const [pendingNote, setPendingNote] = useState<string>('');
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [sortColumn, setSortColumn] = useState<keyof Transaction>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -62,6 +65,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
   const [showBulkCategoryMenu, setShowBulkCategoryMenu] = useState(false);
   const [selectedBulkCategory, setSelectedBulkCategory] = useState<number | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const pageSize = 50;
 
   // Get preferences
@@ -246,6 +250,43 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
     }
   };
 
+  // Note editing functions
+  const handleNoteEditStart = (transactionId: number, currentNote: string) => {
+    setEditingNote(transactionId);
+    setPendingNote(currentNote);
+  };
+
+  const handleNoteCancel = () => {
+    setEditingNote(null);
+    setPendingNote('');
+  };
+
+  const handleNoteApply = async (transactionId: number) => {
+    try {
+      const response = await fetch(`/api/transactions/${transactionId}/note`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ note: pendingNote || null })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update note');
+      }
+
+      // Update the transaction in the local state
+      setTransactions(prev => prev.map(t => 
+        t.id === transactionId ? { ...t, note: pendingNote || null } : t
+      ));
+
+      setEditingNote(null);
+      setPendingNote('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update note');
+    }
+  };
+
   const handleBulkCategorize = async (categoryId: number | null, subcategoryId: number | null) => {
     if (selectedTransactions.size === 0) return;
 
@@ -362,6 +403,51 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
 
   const collapseAllRows = () => {
     setExpandedRows(new Set());
+  };
+
+  const generateExportHTML = () => {
+    const selectedTransactionsList = transactions.filter(t => selectedTransactions.has(t.id));
+    
+    if (selectedTransactionsList.length === 0) {
+      return '<p>No transactions selected for export.</p>';
+    }
+
+    let html = `
+<table border="1" cellpadding="5" cellspacing="0">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Account</th>
+      <th>Amount</th>
+      <th>Payee</th>
+      <th>Action</th>
+      <th>Category</th>
+      <th>Subcategory</th>
+    </tr>
+  </thead>
+  <tbody>
+`;
+
+    selectedTransactionsList.forEach(transaction => {
+      html += `
+    <tr>
+      <td>${formatDate(transaction.date)}</td>
+      <td>${transaction.account || ''}</td>
+      <td>${formatCurrency(transaction.amount)}</td>
+      <td>${transaction.payee || ''}</td>
+      <td>${transaction.action || ''}</td>
+      <td>${transaction.category || ''}</td>
+      <td>${transaction.subcategory || ''}</td>
+    </tr>`;
+    });
+
+    html += `
+  </tbody>
+</table>
+
+<p><strong>Exported ${selectedTransactionsList.length} transaction(s) on ${new Date().toLocaleString()}</strong></p>`;
+
+    return html;
   };
 
   const formatCurrency = (amount: number) => {
@@ -533,6 +619,13 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
           >
             Delete Selected
           </button>
+          <button
+            className={styles.bulkExportButton}
+            onClick={() => setShowExportModal(true)}
+            title="Export selected transactions"
+          >
+            Export Selected
+          </button>
           <div className={styles.bulkCategoryContainer}>
             <button
               className={styles.bulkCategoryButton}
@@ -623,7 +716,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
                       onChange={toggleAllSelection}
                     />
                   </th>
-                  {(['date', 'account', 'payee', 'amount', 'category', 'subcategory'] as const).map(column => (
+                  {(['date', 'account', 'payee', 'amount', 'category', 'subcategory', 'note'] as const).map(column => (
                     <th 
                       key={column}
                       onClick={() => handleSort(column)}
@@ -762,10 +855,58 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
                           </span>
                         )}
                       </td>
+                      <td className={`${styles.tableCell} ${styles.tableCellNote}`}>
+                        {editingNote === transaction.id ? (
+                          <div className={styles.noteEditContainer} onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={pendingNote}
+                              onChange={(e) => setPendingNote(e.target.value)}
+                              className={styles.noteInput}
+                              placeholder="Add a note..."
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleNoteApply(transaction.id);
+                                } else if (e.key === 'Escape') {
+                                  handleNoteCancel();
+                                }
+                              }}
+                            />
+                            <div className={styles.noteEditActions}>
+                              <button
+                                onClick={() => handleNoteApply(transaction.id)}
+                                className={`${styles.editButton} ${styles.editButtonApply}`}
+                                title="Save note"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                onClick={handleNoteCancel}
+                                className={`${styles.editButton} ${styles.editButtonCancel}`}
+                                title="Cancel"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div 
+                            className={styles.noteDisplay}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNoteEditStart(transaction.id, transaction.note || '');
+                            }}
+                            title="Click to edit note"
+                          >
+                            {transaction.note || <span className={styles.noteEmpty}>Add note...</span>}
+                          </div>
+                        )}
+                      </td>
                     </tr>
                     {expandedRows.has(transaction.id) && (
                       <tr className={styles.expandedRow}>
-                        <td colSpan={7} className={styles.expandedContent}>
+                        <td colSpan={8} className={styles.expandedContent}>
                           <div className={styles.expandedDetails}>
                             <div className={styles.detailItem}>
                               <span className={styles.detailLabel}>Action:</span>
@@ -858,6 +999,57 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
                 className={styles.deleteButton}
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.exportModal}>
+            <div className={styles.modalHeader}>
+              <h3>Export Selected Transactions</h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className={styles.modalCloseButton}
+                title="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalContent}>
+              <div className={styles.exportPreview}>
+                <div dangerouslySetInnerHTML={{ __html: generateExportHTML() }} />
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                onClick={() => {
+                  const html = generateExportHTML();
+                  navigator.clipboard.writeText(html).then(() => {
+                    alert('HTML copied to clipboard!');
+                  }).catch(() => {
+                    // Fallback: select the text
+                    const textArea = document.createElement('textarea');
+                    textArea.value = html;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    alert('HTML copied to clipboard!');
+                  });
+                }}
+                className={styles.copyButton}
+              >
+                Copy HTML
+              </button>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className={styles.cancelButton}
+              >
+                Close
               </button>
             </div>
           </div>

@@ -64,6 +64,10 @@ python3 payee_extractor.py --apply
 sqlite3 transactions.db ".schema"
 sqlite3 transactions.db "SELECT * FROM categories;"
 sqlite3 transactions.db "SELECT COUNT(*) FROM transactions WHERE category_id IS NULL;"
+
+# Budget-specific database queries
+sqlite3 transactions.db "SELECT * FROM monthly_budgets ORDER BY budget_year DESC, budget_month DESC;"
+sqlite3 transactions.db "SELECT mbi.*, c.name as category, sc.name as subcategory FROM monthly_budget_items mbi JOIN categories c ON mbi.category_id = c.id LEFT JOIN subcategories sc ON mbi.subcategory_id = sc.id;"
 ```
 
 ### Recurring Pattern Detection
@@ -162,6 +166,12 @@ cd frontend && npm run dev
 - **Pre-built Analytics**: Grocery spending, fast food, income tracking, and Amazon purchase analysis
 - **Backend Integration**: Seamless Flask API communication with automatic proxy configuration
 
+**Important Chart Library Standard:**
+- **Always use Recharts**: All data visualizations should use the Recharts library for consistency
+- **LLM-Friendly**: Recharts provides a more predictable and AI-friendly API compared to custom SVG
+- **Built-in Features**: Recharts handles tooltips, responsive design, and accessibility automatically
+- **Existing Components**: Reference GenericChart.tsx and Budget.tsx for Recharts implementation examples
+
 ### Database Schema
 
 **Core Tables:**
@@ -171,6 +181,13 @@ cd frontend && npm run dev
 - `classification_patterns`: Learned patterns for instant transaction classification
 - `processed_files`: Tracks processed CSV files to prevent reprocessing
 - `recurring_patterns`: Detected recurring transaction patterns for balance projections
+
+**Budget System Tables:**
+- `budget_templates`: Budget template definitions for creating monthly budgets
+- `budget_template_items`: Template items with categories, subcategories, and default amounts
+- `monthly_budgets`: Monthly budget instances created from templates
+- `monthly_budget_items`: **IMPORTANT**: Individual budget line items (NOT `budget_items`)
+- `budget_adjustments`: Manual adjustments to budget amounts
 
 **Key Features:**
 - Hash-based duplicate detection
@@ -399,6 +416,8 @@ All endpoints return JSON with confidence levels, pattern metadata, and proper e
 - Use proper error handling and logging throughout
 - Transaction hashing prevents duplicates: date + account + action + amount + description
 - Foreign key IDs are managed by `get_or_create_category/subcategory` methods
+- **Data Visualization Standard**: Always use Recharts library for charts and graphs - it's more LLM-friendly with predictable APIs, built-in responsiveness, and automatic tooltip management
+- **UI Dialogs Standard**: NEVER use `alert()`, `confirm()`, or `prompt()` - always use custom Dialog components for professional user experience. The project has a reusable Dialog component that supports both simple messages and custom content.
 
 ### Testing
 - Test with existing `transactions.db` to verify migration compatibility
@@ -463,6 +482,7 @@ All endpoints return JSON with confidence levels, pattern metadata, and proper e
 - **Web interface connection**: Ensure Flask API is running on port 5000 before starting React app
 - **CORS errors**: Flask API includes CORS headers; check browser developer console for issues
 - **Date filtering**: Database dates are in MM/DD/YYYY format; API handles conversion
+- **Budget table confusion**: Budget data is stored in `monthly_budget_items` table, NOT `budget_items`
 
 ### Debugging
 - Use `--verbose` for detailed logging
@@ -810,3 +830,58 @@ Database cleanup for better pattern recognition:
 - `RecurringPatterns.tsx`: Interactive chart with transaction markers and tooltips
 - `RecurringPatterns.module.css`: Tooltip styling and responsive design
 - `api_server.py`: Fixed DELETE endpoint parameter handling
+
+## Multi-Account Architecture
+
+The system tracks transactions across multiple accounts with specific roles:
+
+### Account Structure
+- **Primary Account (Z06431462)**: Individual TOD account - main account for balance projections
+- **Secondary Account (Z23693697)**: Wife's account - intermediate account for specific spending categories
+
+### Money Flow Pattern
+```
+Primary Account (Z06431462) → Wife's Account (Z23693697) → Actual Purchases
+```
+
+**Key Insight**: Money transfers from the primary account to the wife's account, who then makes the actual purchases (especially groceries and food). This creates a "pass-through" effect where:
+
+1. **Transfer Out**: Money leaves the primary account (shows as expense)
+2. **Intermediate Stop**: Money arrives in wife's account 
+3. **Final Purchase**: Wife's account makes the actual purchase
+
+### Balance Projection Implications
+
+**Problem**: Traditional analysis would double-count this activity:
+- Primary account shows money leaving (transfer to wife)
+- Wife's account shows money leaving (actual purchase)
+- This creates artificial expense inflation in projections
+
+**Solution**: The system handles this through:
+- **Estimated Patterns**: Analyze spending across BOTH accounts (Z06431462 + Z23693697) to capture actual spending patterns
+- **Balance Projections**: Apply patterns only to PRIMARY account (Z06431462) since that's where the money originates
+- **Pattern Storage**: Save estimated patterns to primary account for consistency
+
+### Implementation Details
+
+**Estimated Pattern Creation**:
+```javascript
+// Analyzes spending across both accounts
+WHERE t.account_number IN ('Z06431462', 'Z23693697')
+
+// But stores pattern to primary account
+account_number: 'Z06431462'
+```
+
+**Why This Works**:
+- Captures true spending velocity (wife's purchasing patterns)
+- Avoids double-counting in balance projections
+- Reflects reality: money leaves primary account at the rate groceries are purchased
+- Provides accurate cashflow forecasting for the primary account
+
+**Visual Indicators**:
+- Balance charts show blue triangles for estimated patterns
+- Estimated patterns marked with "(Estimated)" badge
+- Clear distinction from detected recurring patterns
+
+This architecture ensures accurate balance projections while accounting for the multi-account spending workflow.

@@ -10,6 +10,35 @@
   margin-bottom: 2rem;
 }
 
+.header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.create-estimated-button {
+  padding: 0.75rem 1.5rem;
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-size: 0.875rem;
+}
+
+.create-estimated-button:hover {
+  background: #7c3aed;
+}
+
 .header h1 {
   font-size: 2rem;
   font-weight: 700;
@@ -538,48 +567,60 @@
   padding: 1.5rem;
 }
 
-.projection-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+.projection-summary-table {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  overflow: hidden;
   margin-bottom: 2rem;
 }
 
-.summary-card {
+.projection-summary-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.projection-summary-table th {
   background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
   padding: 1rem;
   text-align: center;
-}
-
-.summary-card h3 {
-  font-size: 0.875rem;
   font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
+  color: #374151;
+  font-size: 0.875rem;
+  letter-spacing: 0.025em;
+  border-bottom: 2px solid #e5e7eb;
+  width: calc(100% / 6);
+  white-space: nowrap;
 }
 
-.summary-card .amount {
-  font-size: 1.5rem;
+.projection-summary-table td {
+  padding: 1.25rem;
+  border-bottom: none;
+  font-size: 1rem;
+  vertical-align: middle;
+  text-align: center;
+  width: calc(100% / 6);
+}
+
+.projection-summary-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* Summary Table Cell Styles - Transposed */
+
+.metric-value {
   font-weight: 700;
+  font-family: monospace;
+  font-size: 1.1rem;
   color: #1f2937;
 }
 
-.summary-card .amount.positive {
+.metric-value.positive {
   color: #10b981;
 }
 
-.summary-card .amount.negative {
+.metric-value.negative {
   color: #ef4444;
-}
-
-.summary-card .count {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #3b82f6;
 }
 
 .balance-chart {
@@ -609,12 +650,137 @@
   margin-bottom: 1rem;
 }
 
-.transactions-list {
-  background: #f9fafb;
+.transactions-table {
+  background: white;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
-  max-height: 400px;
+  overflow: hidden;
+  max-height: 500px;
   overflow-y: auto;
+}
+
+.transactions-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.transactions-table th {
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.transactions-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+.transactions-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* Table Cell Styles */
+
+.transaction-date-cell {
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.pattern-name-cell {
+  min-width: 200px;
+}
+
+.pattern-name-main {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.estimated-badge {
+  display: inline-block;
+  background: #dbeafe;
+  color: #3b82f6;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.payee-cell {
+  color: #6b7280;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amount-cell {
+  font-weight: 700;
+  font-family: monospace;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.amount-cell.positive {
+  color: #10b981;
+}
+
+.amount-cell.negative {
+  color: #ef4444;
+}
+
+.type-cell {
+  text-align: center;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.type-badge.income {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.type-badge.expense {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.confidence-cell {
+  text-align: center;
+}
+
+.confidence-badge {
+  display: inline-block;
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
 }
 
 .transaction-day {
@@ -937,5 +1103,354 @@
   
   .sortable-header {
     font-size: 0.8rem;
+  }
+}
+
+/* Estimated Pattern Creation Modal */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.modal-close:hover {
+  color: #ef4444;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Form Styles */
+
+.form-section {
+  margin-bottom: 2rem;
+}
+
+.form-section h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.form-input {
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 1px #8b5cf6;
+}
+
+.form-select {
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background: white;
+  transition: border-color 0.2s ease;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 1px #8b5cf6;
+}
+
+.compute-section {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.compute-button {
+  padding: 0.75rem 2rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.compute-button:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.compute-button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Statistics Section */
+
+.stats-section {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.stats-section h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.predictability-section {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.predictability-rating {
+  font-size: 1rem;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.confidence-info {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.period-breakdown {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.period-breakdown h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.periods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.period-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.period-dates {
+  color: #6b7280;
+}
+
+.period-amount {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.period-deviation {
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.period-deviation.positive {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.period-deviation.negative {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+/* Modal Footer Buttons */
+
+.create-button {
+  padding: 0.75rem 1.5rem;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.create-button:hover:not(:disabled) {
+  background: #059669;
+}
+
+.create-button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.modal-footer .cancel-button {
+  padding: 0.75rem 1.5rem;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-footer .cancel-button:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+/* Mobile Responsive for Modal */
+
+@media (max-width: 768px) {
+  .modal-content {
+    max-width: 95vw;
+    margin: 0.5rem;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .period-item {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 0.5rem;
+  }
+  
+  .header-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .create-estimated-button {
+    width: 100%;
+    margin-top: 1rem;
   }
 }

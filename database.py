@@ -13,9 +13,6 @@ class TransactionDB:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Check if we need to migrate existing database
-        self._migrate_database(cursor)
-        
         # Categories table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS categories (
@@ -202,6 +199,23 @@ class TransactionDB:
             )
         ''')
         
+        # Payee Extraction Patterns (user-defined patterns for payee extraction)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS payee_extraction_patterns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                pattern TEXT NOT NULL,
+                replacement TEXT NOT NULL,
+                is_regex BOOLEAN DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,
+                created_by TEXT DEFAULT 'user',
+                usage_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (pattern, replacement)
+            )
+        ''')
+        
         # Index for faster duplicate detection
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_hash ON transactions(hash)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_run_date ON transactions(run_date)')
@@ -219,179 +233,17 @@ class TransactionDB:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_recurring_patterns_payee ON recurring_patterns(payee)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_recurring_patterns_next_date ON recurring_patterns(next_expected_date)')
         
+        # Payee extraction patterns indexes for performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_payee_patterns_active ON payee_extraction_patterns(is_active)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_payee_patterns_usage ON payee_extraction_patterns(usage_count DESC)')
+        
         conn.commit()
         conn.close()
     
-    def _migrate_database(self, cursor):
-        """Migrate existing database to new schema"""
-        try:
-            # Check if transactions table exists and what columns it has
-            cursor.execute("PRAGMA table_info(transactions)")
-            columns = [column[1] for column in cursor.fetchall()]
-            
-            if not columns:  # Table doesn't exist yet
-                return
-            
-            # Check if we need to migrate from old text-based categories to new FK structure
-            has_old_category = 'category' in columns and 'category_id' not in columns
-            
-            if has_old_category:
-                # Step 1: Add new columns
-                if 'category_id' not in columns:
-                    cursor.execute('ALTER TABLE transactions ADD COLUMN category_id INTEGER')
-                if 'subcategory_id' not in columns:
-                    cursor.execute('ALTER TABLE transactions ADD COLUMN subcategory_id INTEGER')
-                if 'note' not in columns:
-                    cursor.execute('ALTER TABLE transactions ADD COLUMN note TEXT')
-                if 'payee' not in columns:
-                    cursor.execute('ALTER TABLE transactions ADD COLUMN payee TEXT')
-                
-                # Step 2: Migrate existing category data
-                self._migrate_category_data(cursor)
-                
-            # Add missing columns for databases that never had categories
-            elif 'category_id' not in columns:
-                cursor.execute('ALTER TABLE transactions ADD COLUMN category_id INTEGER')
-            if 'subcategory_id' not in columns:
-                cursor.execute('ALTER TABLE transactions ADD COLUMN subcategory_id INTEGER')
-            if 'note' not in columns:
-                cursor.execute('ALTER TABLE transactions ADD COLUMN note TEXT')
-            if 'payee' not in columns:
-                cursor.execute('ALTER TABLE transactions ADD COLUMN payee TEXT')
-            
-            # Check if we need to migrate dates from MM/DD/YYYY to ISO format
-            self._migrate_date_format(cursor)
-                
-        except sqlite3.OperationalError as e:
-            print(f"Migration error: {e}")
-            pass
-    
-    def _migrate_category_data(self, cursor):
-        """Migrate existing text-based category data to normalized tables"""
-        # Get all unique category/subcategory combinations
-        cursor.execute('''
-            SELECT DISTINCT category, subcategory 
-            FROM transactions 
-            WHERE category IS NOT NULL AND category != ''
-        ''')
-        
-        category_data = cursor.fetchall()
-        
-        for category_name, subcategory_name in category_data:
-            if not category_name:
-                continue
-                
-            # Insert or get category
-            cursor.execute('INSERT OR IGNORE INTO categories (name) VALUES (?)', (category_name,))
-            cursor.execute('SELECT id FROM categories WHERE name = ?', (category_name,))
-            category_id = cursor.fetchone()[0]
-            
-            subcategory_id = None
-            if subcategory_name and subcategory_name.strip():
-                # Insert or get subcategory
-                cursor.execute('''
-                    INSERT OR IGNORE INTO subcategories (category_id, name) 
-                    VALUES (?, ?)
-                ''', (category_id, subcategory_name))
-                cursor.execute('''
-                    SELECT id FROM subcategories 
-                    WHERE category_id = ? AND name = ?
-                ''', (category_id, subcategory_name))
-                result = cursor.fetchone()
-                if result:
-                    subcategory_id = result[0]
-            
-            # Update transactions with new IDs
-            if subcategory_id:
-                cursor.execute('''
-                    UPDATE transactions 
-                    SET category_id = ?, subcategory_id = ?
-                    WHERE category = ? AND subcategory = ?
-                ''', (category_id, subcategory_id, category_name, subcategory_name))
-            else:
-                cursor.execute('''
-                    UPDATE transactions 
-                    SET category_id = ?
-                    WHERE category = ? AND (subcategory IS NULL OR subcategory = '')
-                ''', (category_id, category_name))
-    
-    def _migrate_date_format(self, cursor):
-        """Migrate MM/DD/YYYY dates to ISO format (YYYY-MM-DD)"""
-        try:
-            # Check if we have any MM/DD/YYYY format dates
-            cursor.execute("SELECT COUNT(*) FROM transactions WHERE run_date LIKE '%/%/%'")
-            mm_dd_yyyy_count = cursor.fetchone()[0]
-            
-            if mm_dd_yyyy_count == 0:
-                return  # No dates to migrate
-            
-            print(f"Migrating {mm_dd_yyyy_count} date records from MM/DD/YYYY to ISO format...")
-            
-            # Get all transactions with MM/DD/YYYY dates
-            cursor.execute("SELECT id, run_date, settlement_date FROM transactions WHERE run_date LIKE '%/%/%'")
-            rows = cursor.fetchall()
-            
-            migrated_count = 0
-            error_count = 0
-            
-            for row_id, run_date, settlement_date in rows:
-                try:
-                    # Convert run_date
-                    iso_run_date = self._convert_date_to_iso(run_date)
-                    
-                    # Convert settlement_date if it exists
-                    iso_settlement_date = None
-                    if settlement_date and '/' in settlement_date:
-                        iso_settlement_date = self._convert_date_to_iso(settlement_date)
-                    elif settlement_date:
-                        iso_settlement_date = settlement_date  # Already in ISO format
-                    
-                    if iso_run_date:
-                        cursor.execute('''
-                            UPDATE transactions 
-                            SET run_date = ?, settlement_date = ?
-                            WHERE id = ?
-                        ''', (iso_run_date, iso_settlement_date, row_id))
-                        migrated_count += 1
-                    else:
-                        error_count += 1
-                        print(f"Could not convert date for transaction ID {row_id}: {run_date}")
-                        
-                except Exception as e:
-                    error_count += 1
-                    print(f"Error migrating date for transaction ID {row_id}: {e}")
-            
-            print(f"Date migration complete: {migrated_count} records migrated, {error_count} errors")
-            
-        except Exception as e:
-            print(f"Date migration error: {e}")
-    
-    def _convert_date_to_iso(self, date_str: str) -> Optional[str]:
-        """Helper function to convert MM/DD/YYYY to YYYY-MM-DD"""
-        if not date_str or not date_str.strip():
-            return None
-        
-        try:
-            # Parse MM/DD/YYYY format
-            date_obj = datetime.strptime(date_str.strip(), '%m/%d/%Y')
-            return date_obj.strftime('%Y-%m-%d')
-        except ValueError:
-            try:
-                # Try alternative format MM/DD/YY
-                date_obj = datetime.strptime(date_str.strip(), '%m/%d/%y')
-                return date_obj.strftime('%Y-%m-%d')
-            except ValueError:
-                return None
-    
     def generate_transaction_hash(self, transaction: Dict) -> str:
         """Generate a unique hash for a transaction to detect duplicates"""
-        # Normalize date to ISO format for consistent hashing
-        run_date = transaction.get('run_date', '')
-        if run_date and '/' in run_date:
-            # Convert MM/DD/YYYY to YYYY-MM-DD for consistent hashing
-            run_date = self._convert_date_to_iso(run_date) or run_date
-        
         # Use key fields that should uniquely identify a transaction
+        run_date = transaction.get('run_date', '')
         hash_data = f"{run_date}-{transaction.get('account_number', '')}-{transaction.get('action', '')}-{transaction.get('amount', 0)}-{transaction.get('description', '')}"
         return hashlib.md5(hash_data.encode()).hexdigest()
     

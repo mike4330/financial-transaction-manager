@@ -12,13 +12,70 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+import os
+from logging.handlers import RotatingFileHandler
+
+# Configure logging with rotation
+log_dir = os.path.dirname(os.path.abspath(__file__))
+log_file = os.path.join(log_dir, 'flask_app.log')
+
+# Create logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Create formatter
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+
+# File handler with rotation (10MB max, keep 3 files)
+file_handler = RotatingFileHandler(
+    log_file, maxBytes=10*1024*1024, backupCount=3
+)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+
+# Add handlers to logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+
+# Suppress Flask's default logging to avoid duplicates
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 
+# Request logging middleware
+@app.before_request
+def log_request_info():
+    if request.endpoint != 'health_check':  # Skip health check spam
+        logger.info(f"{request.method} {request.path} - {request.remote_addr}")
+
+@app.after_request
+def log_response_info(response):
+    if request.endpoint != 'health_check' and response.status_code >= 400:
+        logger.warning(f"{request.method} {request.path} - {response.status_code}")
+    return response
+
 DATABASE_PATH = "transactions.db"
+
+# Global database instance to avoid re-initialization
+_db_instance = None
+
+def get_transaction_db():
+    """Get a shared TransactionDB instance to avoid re-initialization"""
+    global _db_instance
+    if _db_instance is None:
+        logger.info("Initializing shared TransactionDB instance")
+        from database import TransactionDB
+        _db_instance = TransactionDB(DATABASE_PATH)
+        logger.info("TransactionDB instance created successfully")
+    return _db_instance
 
 def get_db_connection():
     """Get database connection"""
@@ -66,6 +123,7 @@ def get_transactions():
             t.description,
             t.action,
             t.type as transaction_type,
+            t.note,
             c.name as category,
             s.name as subcategory,
             t.category_id,
@@ -142,7 +200,8 @@ def get_transactions():
             'payee': 't.payee',
             'category': 'c.name',
             'subcategory': 's.name',
-            'transaction_type': 't.type'
+            'transaction_type': 't.type',
+            'note': 't.note'
         }
         
         # Validate sort column and direction
@@ -516,8 +575,7 @@ def get_monthly_budget(year: int, month: int):
         monthly_budget_id = monthly_budget['id']
         
         # Update actual amounts to ensure they're current
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         db.update_actual_amounts(year, month)
         
         # Get budget items with category/subcategory names
@@ -584,8 +642,7 @@ def get_monthly_budget(year: int, month: int):
 def update_budget_actuals(year: int, month: int):
     """Update actual amounts for a monthly budget from transaction data"""
     try:
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         
         updated_count = db.update_actual_amounts(year, month)
         
@@ -602,8 +659,7 @@ def update_budget_actuals(year: int, month: int):
 def auto_calculate_budget_amount(item_id: int):
     """Calculate historical average for a budget item"""
     try:
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         
         conn = get_db_connection()
         
@@ -671,8 +727,7 @@ def update_budget_item(item_id: int):
         except (ValueError, TypeError):
             return jsonify({"error": "budgeted_amount must be a valid number"}), 400
         
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         
         success = db.update_budget_item_amount(item_id, budgeted_amount)
         
@@ -692,8 +747,7 @@ def update_budget_item(item_id: int):
 def create_next_month_budget():
     """Create next month's budget from the default template"""
     try:
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         
         # Get the latest budget month to determine next month
         conn = get_db_connection()
@@ -1107,8 +1161,7 @@ def detect_recurring_patterns():
         lookback_days = data.get('lookback_days', 365)
         account_number = data.get('account_number')  # Optional account filter
         
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         
         patterns = db.detect_recurring_patterns(
             account_number=account_number,
@@ -1177,8 +1230,7 @@ def get_recurring_patterns():
         account_number = request.args.get('account_number')
         active_only = request.args.get('active_only', 'true') == 'true'
         
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         
         patterns = db.get_recurring_patterns(
             account_number=account_number, 
@@ -1230,8 +1282,7 @@ def save_recurring_pattern():
         if not data:
             return jsonify({"error": "No data provided"}), 400
         
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         
         # Convert API format back to internal format
         pattern = {
@@ -1274,8 +1325,7 @@ def update_recurring_pattern(pattern_id):
         if not data:
             return jsonify({"error": "No data provided"}), 400
         
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         
         # Use the new comprehensive update method
         success = db.update_pattern(pattern_id, data)
@@ -1296,8 +1346,7 @@ def update_recurring_pattern(pattern_id):
 def delete_recurring_pattern(pattern_id):
     """Delete (deactivate) a recurring pattern"""
     try:
-        from database import TransactionDB
-        db = TransactionDB()
+        db = get_transaction_db()
         
         success = db.deactivate_pattern(pattern_id)
         
@@ -1311,6 +1360,157 @@ def delete_recurring_pattern(pattern_id):
         
     except Exception as e:
         logger.error(f"Error deactivating recurring pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/category-spending-analysis', methods=['GET'])
+def analyze_category_spending():
+    """Analyze spending patterns for a category to create estimated patterns"""
+    try:
+        # Get query parameters
+        category = request.args.get('category', '')
+        subcategory = request.args.get('subcategory', '')
+        frequency = request.args.get('frequency', 'biweekly')
+        lookback_days = int(request.args.get('lookback_days', 120))
+        account = request.args.get('account', '')
+        
+        if not category:
+            return jsonify({"error": "Category parameter is required"}), 400
+        
+        # Calculate date range
+        from datetime import datetime, timedelta
+        import statistics
+        
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=lookback_days)
+        
+        conn = get_db_connection()
+        
+        # Build query based on parameters
+        where_conditions = [
+            "t.run_date >= ?",
+            "t.run_date <= ?", 
+            "c.name = ?",
+            "t.amount < 0"  # Only expenses
+        ]
+        params = [start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), category]
+        
+        if subcategory:
+            where_conditions.append("sc.name = ?")
+            params.append(subcategory)
+            
+        # Include both target accounts for placeholder analysis
+        where_conditions.append("t.account_number IN (?, ?)")
+        params.extend(['Z06431462', 'Z23693697'])
+        
+        # Get transactions
+        query = f'''
+            SELECT t.run_date, ABS(t.amount) as amount
+            FROM transactions t
+            JOIN categories c ON t.category_id = c.id
+            LEFT JOIN subcategories sc ON t.subcategory_id = sc.id
+            WHERE {' AND '.join(where_conditions)}
+            ORDER BY t.run_date
+        '''
+        
+        transactions = conn.execute(query, params).fetchall()
+        conn.close()
+        
+        if len(transactions) < 2:
+            return jsonify({"error": "Not enough transaction data for analysis"}), 400
+        
+        # Group transactions by frequency period
+        frequency_days = {
+            'weekly': 7,
+            'biweekly': 14, 
+            'monthly': 30
+        }
+        
+        period_length = frequency_days.get(frequency, 14)
+        
+        # Create period bins
+        periods = []
+        current_start = start_date
+        period_num = 1
+        
+        # Convert transactions to dict for lookup
+        tx_by_date = {}
+        for tx in transactions:
+            date = datetime.strptime(tx['run_date'], '%Y-%m-%d')
+            amount = float(tx['amount'])
+            
+            if date not in tx_by_date:
+                tx_by_date[date] = 0
+            tx_by_date[date] += amount
+        
+        while current_start < end_date:
+            period_end = current_start + timedelta(days=period_length)
+            if period_end > end_date:
+                period_end = end_date
+            
+            # Sum all transactions in this period
+            period_total = 0
+            for date, amount in tx_by_date.items():
+                if current_start <= date < period_end:
+                    period_total += amount
+            
+            periods.append({
+                'period': period_num,
+                'start': current_start.strftime('%m/%d'),
+                'end': period_end.strftime('%m/%d'),
+                'total': period_total
+            })
+            
+            current_start = period_end
+            period_num += 1
+        
+        # Calculate statistics
+        amounts = [p['total'] for p in periods if p['total'] > 0]  # Only non-zero periods
+        
+        if len(amounts) < 2:
+            return jsonify({"error": "Insufficient spending data for reliable analysis"}), 400
+        
+        mean_spending = statistics.mean(amounts)
+        std_dev = statistics.stdev(amounts)
+        cv = std_dev / mean_spending if mean_spending > 0 else 0
+        min_spending = min(amounts)
+        max_spending = max(amounts)
+        
+        # Add deviation percentages to periods
+        for period in periods:
+            if period['total'] > 0:
+                period['deviation'] = (period['total'] - mean_spending) / mean_spending * 100
+            else:
+                period['deviation'] = -100  # Empty period
+        
+        # Determine predictability rating
+        if cv < 0.2:
+            predictability_rating = 'Very High (Excellent for forecasting)'
+        elif cv < 0.3:
+            predictability_rating = 'High (Good for forecasting)'
+        elif cv < 0.5:
+            predictability_rating = 'Medium (Acceptable for forecasting)'
+        else:
+            predictability_rating = 'Low (Poor for forecasting)'
+        
+        return jsonify({
+            'category': category,
+            'subcategory': subcategory,
+            'frequency': frequency,
+            'lookback_days': lookback_days,
+            'mean': mean_spending,
+            'std_dev': std_dev,
+            'cv': cv,
+            'min': min_spending,
+            'max': max_spending,
+            'range': max_spending - min_spending,
+            'periods': periods,
+            'predictability_rating': predictability_rating,
+            'transaction_count': len(transactions),
+            'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+        
+    except Exception as e:
+        logger.error(f"Error analyzing category spending: {e}")
         return jsonify({"error": str(e)}), 500
 
 def _get_confidence_level(confidence: float) -> str:
@@ -1342,10 +1542,9 @@ def calculate_balance_projection():
         projection_days = data.get('projection_days', 90)
         account_number = 'Z06431462'  # Individual - TOD account only
         
-        from database import TransactionDB
         from datetime import datetime, timedelta
         
-        db = TransactionDB()
+        db = get_transaction_db()
         
         # Get active recurring patterns for the Individual - TOD account
         patterns = db.get_recurring_patterns(account_number=account_number, active_only=True)
@@ -1406,17 +1605,14 @@ def calculate_balance_projection():
                         should_occur = True
                 
                 if should_occur:
-                    # Apply confidence weighting to the transaction
-                    confidence_factor = confidence if confidence else 0.5
-                    weighted_amount = typical_amount * confidence_factor
-                    
+                    # Use full typical amount for cashflow estimates
                     # Determine if this is income (positive) or expense (negative)
                     # Income patterns: direct deposit, dividends, transfers in
                     is_income = ('direct deposit' in pattern_name.lower() or 
                                'dividend' in pattern_name.lower() or
                                'interest' in pattern_name.lower())
                     
-                    transaction_amount = weighted_amount if is_income else -weighted_amount
+                    transaction_amount = typical_amount if is_income else -typical_amount
                     daily_change += transaction_amount
                     
                     projected_transactions.append({
@@ -1463,7 +1659,538 @@ def calculate_balance_projection():
         logger.error(f"Error calculating balance projection: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/monthly-pattern-projections', methods=['GET'])
+def get_monthly_pattern_projections():
+    """Get projected amounts from recurring patterns for a specific month"""
+    try:
+        from datetime import datetime, timedelta
+        import calendar
+        
+        # Get query parameters
+        year = int(request.args.get('year', datetime.now().year))
+        month = int(request.args.get('month', datetime.now().month))
+        
+        # Calculate month boundaries
+        start_date = datetime(year, month, 1)
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end_date = datetime(year, month + 1, 1) - timedelta(days=1)
+        
+        days_in_month = (end_date - start_date).days + 1
+        
+        conn = get_db_connection()
+        
+        # Get active recurring patterns
+        patterns = conn.execute('''
+            SELECT id, pattern_name, account_number, payee, typical_amount, 
+                   frequency_type, frequency_interval, next_expected_date,
+                   last_occurrence_date, category_id, subcategory_id
+            FROM recurring_patterns 
+            WHERE is_active = 1
+        ''').fetchall()
+        
+        # Group projections by category/subcategory
+        category_projections = {}
+        
+        for pattern in patterns:
+            pattern_id, pattern_name, account_number, payee, typical_amount, frequency_type, frequency_interval, next_expected_date, last_occurrence_date, category_id, subcategory_id = pattern
+            
+            # Calculate expected occurrences in the month
+            frequency_days = {
+                'daily': 1,
+                'weekly': 7, 
+                'biweekly': 14,
+                'monthly': 30,
+                'quarterly': 90,
+                'annual': 365
+            }
+            
+            period_days = frequency_days.get(frequency_type, 30)
+            expected_occurrences = max(1, round(days_in_month / period_days))
+            
+            # Calculate monthly projection
+            monthly_amount = typical_amount * expected_occurrences
+            
+            # Determine if income or expense
+            is_income = ('direct deposit' in pattern_name.lower() or 
+                        'dividend' in pattern_name.lower() or
+                        'salary' in pattern_name.lower() or
+                        'income' in pattern_name.lower())
+            
+            transaction_type = 'income' if is_income else 'expense'
+            monthly_amount = abs(monthly_amount)  # Always positive for aggregation
+            
+            # Get category/subcategory names
+            category_name = 'Uncategorized'
+            subcategory_name = None
+            
+            if category_id:
+                cat_result = conn.execute('SELECT name FROM categories WHERE id = ?', (category_id,)).fetchone()
+                if cat_result:
+                    category_name = cat_result[0]
+                    
+            if subcategory_id:
+                sub_result = conn.execute('SELECT name FROM subcategories WHERE id = ?', (subcategory_id,)).fetchone()
+                if sub_result:
+                    subcategory_name = sub_result[0]
+            
+            # Create category key
+            category_key = f"{category_name}|{subcategory_name or ''}"
+            
+            if category_key not in category_projections:
+                category_projections[category_key] = {
+                    'category': category_name,
+                    'subcategory': subcategory_name,
+                    'income_projected': 0,
+                    'expense_projected': 0,
+                    'patterns': []
+                }
+            
+            # Add to appropriate total
+            if transaction_type == 'income':
+                category_projections[category_key]['income_projected'] += monthly_amount
+            else:
+                category_projections[category_key]['expense_projected'] += monthly_amount
+                
+            # Add pattern details
+            category_projections[category_key]['patterns'].append({
+                'pattern_name': pattern_name,
+                'payee': payee,
+                'amount': monthly_amount,
+                'type': transaction_type,
+                'frequency': frequency_type,
+                'occurrences': expected_occurrences
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'year': year,
+            'month': month,
+            'days_in_month': days_in_month,
+            'category_projections': list(category_projections.values())
+        })
+        
+    except Exception as e:
+        logger.error(f"Error calculating monthly pattern projections: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/transactions/<int:transaction_id>/note', methods=['PUT'])
+def update_transaction_note(transaction_id):
+    """Update the note field for a specific transaction"""
+    try:
+        data = request.get_json()
+        note = data.get('note')
+        
+        # Note can be None/null to clear it
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE transactions 
+            SET note = ? 
+            WHERE id = ?
+        ''', (note, transaction_id))
+        conn.commit()
+        
+        # Check if the update was successful
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({"error": "Transaction not found"}), 404
+            
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "message": "Note updated successfully",
+            "transaction_id": transaction_id,
+            "note": note
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating transaction note: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# Payee Pattern Management API Endpoints
+
+@app.route('/api/payee-patterns', methods=['GET'])
+def get_payee_patterns():
+    """Get all payee extraction patterns"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, name, pattern, replacement, is_regex, is_active, 
+                   created_by, usage_count, created_at, updated_at
+            FROM payee_extraction_patterns 
+            ORDER BY usage_count DESC, created_at DESC
+        ''')
+        
+        patterns = []
+        for row in cursor.fetchall():
+            patterns.append({
+                "id": row['id'],
+                "name": row['name'],
+                "pattern": row['pattern'],
+                "replacement": row['replacement'],
+                "is_regex": bool(row['is_regex']),
+                "is_active": bool(row['is_active']),
+                "created_by": row['created_by'],
+                "usage_count": row['usage_count'],
+                "created_at": row['created_at'],
+                "updated_at": row['updated_at']
+            })
+        
+        conn.close()
+        return jsonify({"patterns": patterns})
+        
+    except Exception as e:
+        logger.error(f"Error fetching payee patterns: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/payee-patterns', methods=['POST'])
+def create_payee_pattern():
+    """Create a new payee extraction pattern"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data or not all(key in data for key in ['name', 'pattern', 'replacement']):
+            return jsonify({"error": "Missing required fields: name, pattern, replacement"}), 400
+        
+        name = data['name'].strip()
+        pattern = data['pattern'].strip()
+        replacement = data['replacement'].strip()
+        is_regex = data.get('is_regex', False)
+        is_active = data.get('is_active', True)
+        
+        if not name or not pattern or not replacement:
+            return jsonify({"error": "Name, pattern, and replacement cannot be empty"}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check for duplicate pattern/replacement combination
+        cursor.execute('''
+            SELECT id FROM payee_extraction_patterns 
+            WHERE pattern = ? AND replacement = ?
+        ''', (pattern, replacement))
+        
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Pattern with this replacement already exists"}), 409
+        
+        # Insert new pattern
+        cursor.execute('''
+            INSERT INTO payee_extraction_patterns (name, pattern, replacement, is_regex, is_active)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (name, pattern, replacement, is_regex, is_active))
+        
+        pattern_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Created new payee pattern: {name} ({pattern} → {replacement})")
+        
+        return jsonify({
+            "success": True,
+            "message": "Pattern created successfully",
+            "id": pattern_id
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Error creating payee pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/payee-patterns/<int:pattern_id>', methods=['PUT'])
+def update_payee_pattern(pattern_id: int):
+    """Update an existing payee extraction pattern"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if pattern exists
+        cursor.execute('SELECT id FROM payee_extraction_patterns WHERE id = ?', (pattern_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Pattern not found"}), 404
+        
+        # Build update query dynamically based on provided fields
+        update_fields = []
+        update_values = []
+        
+        if 'name' in data:
+            update_fields.append('name = ?')
+            update_values.append(data['name'].strip())
+        
+        if 'pattern' in data:
+            update_fields.append('pattern = ?')
+            update_values.append(data['pattern'].strip())
+        
+        if 'replacement' in data:
+            update_fields.append('replacement = ?')
+            update_values.append(data['replacement'].strip())
+        
+        if 'is_regex' in data:
+            update_fields.append('is_regex = ?')
+            update_values.append(data['is_regex'])
+        
+        if 'is_active' in data:
+            update_fields.append('is_active = ?')
+            update_values.append(data['is_active'])
+        
+        if not update_fields:
+            conn.close()
+            return jsonify({"error": "No valid fields to update"}), 400
+        
+        # Add updated_at timestamp
+        update_fields.append('updated_at = CURRENT_TIMESTAMP')
+        update_values.append(pattern_id)
+        
+        query = f"UPDATE payee_extraction_patterns SET {', '.join(update_fields)} WHERE id = ?"
+        cursor.execute(query, update_values)
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Updated payee pattern ID {pattern_id}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Pattern updated successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating payee pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/payee-patterns/<int:pattern_id>', methods=['DELETE'])
+def delete_payee_pattern(pattern_id: int):
+    """Delete a payee extraction pattern"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if pattern exists
+        cursor.execute('SELECT name FROM payee_extraction_patterns WHERE id = ?', (pattern_id,))
+        pattern = cursor.fetchone()
+        
+        if not pattern:
+            conn.close()
+            return jsonify({"error": "Pattern not found"}), 404
+        
+        # Delete the pattern
+        cursor.execute('DELETE FROM payee_extraction_patterns WHERE id = ?', (pattern_id,))
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Deleted payee pattern: {pattern['name']} (ID: {pattern_id})")
+        
+        return jsonify({
+            "success": True,
+            "message": "Pattern deleted successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting payee pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/payee-patterns/test', methods=['POST'])
+def test_payee_pattern():
+    """Test a payee extraction pattern against sample text"""
+    try:
+        data = request.get_json()
+        
+        if not data or not all(key in data for key in ['pattern', 'replacement', 'test_text']):
+            return jsonify({"error": "Missing required fields: pattern, replacement, test_text"}), 400
+        
+        pattern = data['pattern']
+        replacement = data['replacement']
+        test_text = data['test_text']
+        is_regex = data.get('is_regex', False)
+        
+        # Import the payee extractor logic
+        import re
+        
+        result = None
+        error = None
+        
+        try:
+            if is_regex:
+                # Use regex replacement
+                if '(' in pattern and '$' in replacement:
+                    # Capture group replacement
+                    match = re.search(pattern, test_text, re.IGNORECASE)
+                    if match:
+                        # Handle $1, $2, etc. replacements
+                        result = replacement
+                        for i in range(1, min(10, len(match.groups()) + 1)):
+                            result = result.replace(f'${i}', match.group(i))
+                else:
+                    # Simple regex match
+                    if re.search(pattern, test_text, re.IGNORECASE):
+                        result = replacement
+            else:
+                # Simple string matching
+                if pattern.upper() in test_text.upper():
+                    result = replacement
+        
+        except Exception as regex_error:
+            error = f"Pattern error: {str(regex_error)}"
+        
+        return jsonify({
+            "success": True,
+            "test_text": test_text,
+            "pattern": pattern,
+            "replacement": replacement,
+            "is_regex": is_regex,
+            "result": result,
+            "error": error
+        })
+        
+    except Exception as e:
+        logger.error(f"Error testing payee pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/payee-patterns/<int:pattern_id>/apply', methods=['POST'])
+def apply_payee_pattern(pattern_id: int):
+    """Apply a specific payee pattern to matching transactions"""
+    try:
+        data = request.get_json() or {}
+        preview_only = data.get('preview', False)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get the pattern details
+        cursor.execute('''
+            SELECT pattern, replacement, is_regex, name 
+            FROM payee_extraction_patterns 
+            WHERE id = ? AND is_active = 1
+        ''', (pattern_id,))
+        
+        pattern_row = cursor.fetchone()
+        if not pattern_row:
+            conn.close()
+            return jsonify({"error": "Pattern not found or inactive"}), 404
+        
+        pattern = pattern_row['pattern']
+        replacement = pattern_row['replacement']
+        is_regex = bool(pattern_row['is_regex'])
+        pattern_name = pattern_row['name']
+        
+        # Find matching transactions with "No Description" or NULL payee
+        cursor.execute('''
+            SELECT id, action, payee, run_date, account, amount
+            FROM transactions 
+            WHERE (payee = 'No Description' OR payee IS NULL)
+            ORDER BY id DESC
+            LIMIT 1000
+        ''')
+        
+        transactions = cursor.fetchall()
+        matches = []
+        
+        import re
+        
+        for transaction in transactions:
+            action = transaction['action'] or ''
+            extracted_payee = None
+            
+            try:
+                if is_regex:
+                    # Use regex replacement
+                    if '(' in pattern and '$' in replacement:
+                        # Capture group replacement
+                        match = re.search(pattern, action, re.IGNORECASE)
+                        if match:
+                            # Handle $1, $2, etc. replacements
+                            extracted_payee = replacement
+                            for i in range(1, min(10, len(match.groups()) + 1)):
+                                extracted_payee = extracted_payee.replace(f'${i}', match.group(i))
+                    else:
+                        # Simple regex match
+                        if re.search(pattern, action, re.IGNORECASE):
+                            extracted_payee = replacement
+                else:
+                    # Simple string matching
+                    if pattern.upper() in action.upper():
+                        extracted_payee = replacement
+                
+                if extracted_payee:
+                    matches.append({
+                        "id": transaction['id'],
+                        "action": action,
+                        "current_payee": transaction['payee'],
+                        "new_payee": extracted_payee,
+                        "date": transaction['run_date'],
+                        "account": transaction['account'],
+                        "amount": float(transaction['amount'])
+                    })
+            
+            except Exception as regex_error:
+                logger.warning(f"Pattern error for transaction {transaction['id']}: {regex_error}")
+                continue
+        
+        if preview_only:
+            conn.close()
+            return jsonify({
+                "success": True,
+                "preview": True,
+                "pattern_name": pattern_name,
+                "matches_found": len(matches),
+                "matches": matches[:50],  # Limit preview to 50 transactions
+                "total_matches": len(matches)
+            })
+        
+        # Apply the updates
+        updated_count = 0
+        for match in matches:
+            cursor.execute('''
+                UPDATE transactions 
+                SET payee = ?
+                WHERE id = ?
+            ''', (match['new_payee'], match['id']))
+            updated_count += cursor.rowcount
+        
+        # Update pattern usage count
+        cursor.execute('''
+            UPDATE payee_extraction_patterns 
+            SET usage_count = usage_count + ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (updated_count, pattern_id))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Applied pattern '{pattern_name}' to {updated_count} transactions")
+        
+        return jsonify({
+            "success": True,
+            "applied": True,
+            "pattern_name": pattern_name,
+            "updated_count": updated_count,
+            "matches": matches[:20] if len(matches) <= 20 else matches[:10] + [{"summary": f"... and {len(matches) - 10} more"}]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error applying payee pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
+    logger.info("🚀 Starting Flask API Server...")
+    logger.info("📊 API will be available at http://localhost:5000")
+    logger.info("🔗 Health check: http://localhost:5000/api/health")
+    logger.info("📋 Transactions: http://localhost:5000/api/transactions")
+    logger.info("💰 Budget: http://localhost:5000/api/budget/2025/8")
+    logger.info("🛑 Press Ctrl+C to stop")
+    
     print("🚀 Starting Flask API Server...")
     print("📊 API will be available at http://localhost:5000")
     print("🔗 Health check: http://localhost:5000/api/health")
@@ -1471,4 +2198,10 @@ if __name__ == '__main__':
     print("💰 Budget: http://localhost:5000/api/budget/2025/8")
     print("🛑 Press Ctrl+C to stop")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    try:
+        app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=True)
+    except KeyboardInterrupt:
+        logger.info("Flask server stopped by user")
+    except Exception as e:
+        logger.error(f"Flask server error: {e}")
+        raise

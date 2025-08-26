@@ -1,0 +1,12 @@
+[Unit]
+Description=Financial Transaction Management System
+After=network.target
+Wants=financial-tracker-backend.service financial-tracker-frontend.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/true
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

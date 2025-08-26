@@ -1,0 +1,35 @@
+[Unit]
+Description=Financial Tracker React Frontend
+After=network.target financial-tracker-backend.service
+Requires=financial-tracker-backend.service
+PartOf=financial-tracker.service
+
+[Service]
+Type=simple
+User=mike
+Group=mike
+WorkingDirectory=/var/www/html/bank/frontend
+Environment=PATH=/usr/bin:/usr/local/bin:/home/mike/.nvm/versions/node/v20.16.0/bin
+Environment=NODE_ENV=development
+Environment=VITE_API_URL=http://localhost:5000
+ExecStartPre=/bin/bash -c 'cd /var/www/html/bank/frontend && npm ci'
+ExecStart=/home/mike/.nvm/versions/node/v20.16.0/bin/npm run dev -- --host 0.0.0.0 --port 3001
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=financial-tracker-frontend
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/www/html/bank/frontend
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target
