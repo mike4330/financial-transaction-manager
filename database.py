@@ -216,6 +216,51 @@ class TransactionDB:
             )
         ''')
         
+        # Quicken Reconciliation Tracking - tracks which QIF transactions have been processed
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS qif_reconciliation_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                qif_file_path TEXT NOT NULL,
+                batch_number INTEGER NOT NULL,
+                qif_transaction_hash TEXT NOT NULL,
+                qif_date DATE NOT NULL,
+                qif_amount DECIMAL(12,2) NOT NULL,
+                qif_payee TEXT,
+                qif_category TEXT,
+                qif_memo TEXT,
+                reconciliation_status TEXT CHECK (reconciliation_status IN ('pending', 'matched', 'imported', 'skipped', 'duplicate')) DEFAULT 'pending',
+                matched_transaction_id INTEGER,
+                import_decision TEXT,  -- JSON of LLM decisions
+                reconciled_at TIMESTAMP,
+                reconciled_by TEXT DEFAULT 'claude_code',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (matched_transaction_id) REFERENCES transactions (id),
+                UNIQUE (qif_file_path, qif_transaction_hash)
+            )
+        ''')
+        
+        # Quicken Category Mappings - learned rules for category mapping
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS qif_category_mappings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                quicken_category TEXT NOT NULL,
+                quicken_subcategory TEXT,
+                app_category_id INTEGER NOT NULL,
+                app_subcategory_id INTEGER,
+                confidence REAL DEFAULT 1.0,
+                mapping_type TEXT CHECK (mapping_type IN ('exact', 'fuzzy', 'llm_learned')) DEFAULT 'exact',
+                usage_count INTEGER DEFAULT 0,
+                last_used TIMESTAMP,
+                created_by TEXT DEFAULT 'claude_code',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (app_category_id) REFERENCES categories (id),
+                FOREIGN KEY (app_subcategory_id) REFERENCES subcategories (id),
+                UNIQUE (quicken_category, quicken_subcategory)
+            )
+        ''')
+        
         # Index for faster duplicate detection
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_hash ON transactions(hash)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_run_date ON transactions(run_date)')
@@ -237,8 +282,387 @@ class TransactionDB:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_payee_patterns_active ON payee_extraction_patterns(is_active)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_payee_patterns_usage ON payee_extraction_patterns(usage_count DESC)')
         
+        # QIF reconciliation indexes for performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_qif_recon_file ON qif_reconciliation_log(qif_file_path)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_qif_recon_status ON qif_reconciliation_log(reconciliation_status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_qif_recon_hash ON qif_reconciliation_log(qif_transaction_hash)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_qif_category_mappings_quicken ON qif_category_mappings(quicken_category)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_qif_category_mappings_usage ON qif_category_mappings(usage_count DESC)')
+        
         conn.commit()
         conn.close()
+    
+    # Quicken Reconciliation Methods
+    
+    def check_qif_transaction_processed(self, qif_hash: str) -> Optional[Dict]:
+        """Check if a QIF transaction has already been processed"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT qif_file_path, batch_number, reconciliation_status, 
+                       matched_transaction_id, reconciled_at
+                FROM qif_reconciliation_log 
+                WHERE qif_transaction_hash = ?
+            ''', (qif_hash,))
+            
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'qif_file_path': result[0],
+                    'batch_number': result[1],
+                    'status': result[2],
+                    'matched_transaction_id': result[3],
+                    'reconciled_at': result[4]
+                }
+            return None
+            
+        except Exception as e:
+            print(f"Error checking QIF transaction: {e}")
+            return None
+        finally:
+            conn.close()
+    
+    def find_similar_transactions(self, date: str, amount: float, payee: str = "", 
+                                tolerance_days: int = 3) -> List[Dict]:
+        """Find similar transactions in the main database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # Convert date string to date object for comparison
+            from datetime import datetime, timedelta
+            search_date = datetime.fromisoformat(date).date()
+            start_date = search_date - timedelta(days=tolerance_days)
+            end_date = search_date + timedelta(days=tolerance_days)
+            
+            # Search for similar transactions
+            cursor.execute('''
+                SELECT id, run_date, amount, payee, action, description, 
+                       account_number, category_id, subcategory_id
+                FROM transactions 
+                WHERE DATE(run_date) BETWEEN ? AND ?
+                AND ABS(amount - ?) < 0.01
+                AND (payee LIKE ? OR action LIKE ? OR description LIKE ?)
+                ORDER BY run_date DESC
+                LIMIT 10
+            ''', (start_date.isoformat(), end_date.isoformat(), amount, 
+                  f"%{payee}%", f"%{payee}%", f"%{payee}%"))
+            
+            results = cursor.fetchall()
+            similar = []
+            
+            for row in results:
+                similar.append({
+                    'id': row[0],
+                    'date': row[1],
+                    'amount': row[2],
+                    'payee': row[3],
+                    'action': row[4],
+                    'description': row[5],
+                    'account': row[6],
+                    'category_id': row[7],
+                    'subcategory_id': row[8]
+                })
+            
+            return similar
+            
+        except Exception as e:
+            print(f"Error finding similar transactions: {e}")
+            return []
+        finally:
+            conn.close()
+    
+    def log_qif_transaction(self, qif_file_path: str, batch_number: int, 
+                          qif_transaction: Dict, qif_hash: str, 
+                          status: str = 'pending') -> bool:
+        """Log a QIF transaction for reconciliation tracking"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                INSERT OR REPLACE INTO qif_reconciliation_log 
+                (qif_file_path, batch_number, qif_transaction_hash, qif_date, 
+                 qif_amount, qif_payee, qif_category, qif_memo, reconciliation_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                qif_file_path, batch_number, qif_hash, qif_transaction['date'],
+                qif_transaction['amount'], qif_transaction.get('payee'),
+                qif_transaction.get('category'), qif_transaction.get('memo'),
+                status
+            ))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            print(f"Error logging QIF transaction: {e}")
+            return False
+        finally:
+            conn.close()
+    
+    def save_category_mapping(self, quicken_category: str, quicken_subcategory: str,
+                            app_category_id: int, app_subcategory_id: int = None,
+                            confidence: float = 1.0, mapping_type: str = 'llm_learned') -> bool:
+        """Save a learned category mapping rule"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                INSERT OR REPLACE INTO qif_category_mappings 
+                (quicken_category, quicken_subcategory, app_category_id, 
+                 app_subcategory_id, confidence, mapping_type, usage_count, 
+                 last_used, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 
+                        COALESCE((SELECT usage_count FROM qif_category_mappings 
+                                WHERE quicken_category = ? AND quicken_subcategory = ?), 0) + 1,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ''', (
+                quicken_category, quicken_subcategory, app_category_id,
+                app_subcategory_id, confidence, mapping_type,
+                quicken_category, quicken_subcategory
+            ))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            print(f"Error saving category mapping: {e}")
+            return False
+        finally:
+            conn.close()
+    
+    def get_category_mapping(self, quicken_category: str, quicken_subcategory: str = None) -> Optional[Dict]:
+        """Get existing category mapping for a Quicken category"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT app_category_id, app_subcategory_id, confidence, mapping_type
+                FROM qif_category_mappings 
+                WHERE quicken_category = ? 
+                AND (quicken_subcategory = ? OR (quicken_subcategory IS NULL AND ? IS NULL))
+                ORDER BY confidence DESC, usage_count DESC
+                LIMIT 1
+            ''', (quicken_category, quicken_subcategory, quicken_subcategory))
+            
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'app_category_id': result[0],
+                    'app_subcategory_id': result[1],
+                    'confidence': result[2],
+                    'mapping_type': result[3]
+                }
+            return None
+            
+        except Exception as e:
+            print(f"Error getting category mapping: {e}")
+            return None
+        finally:
+            conn.close()
+    
+    def get_reconciliation_progress(self, qif_file_path: str = None) -> Dict:
+        """Get reconciliation progress summary"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            where_clause = ""
+            params = []
+            if qif_file_path:
+                where_clause = "WHERE qif_file_path = ?"
+                params.append(qif_file_path)
+            
+            cursor.execute(f'''
+                SELECT reconciliation_status, COUNT(*) 
+                FROM qif_reconciliation_log 
+                {where_clause}
+                GROUP BY reconciliation_status
+            ''', params)
+            
+            status_counts = dict(cursor.fetchall())
+            
+            # Get category mapping stats
+            cursor.execute('SELECT COUNT(*) FROM qif_category_mappings')
+            mapping_count = cursor.fetchone()[0]
+            
+            return {
+                'transaction_counts': status_counts,
+                'total_transactions': sum(status_counts.values()),
+                'category_mappings_learned': mapping_count,
+                'completion_rate': (status_counts.get('imported', 0) + 
+                                  status_counts.get('matched', 0) + 
+                                  status_counts.get('skipped', 0)) / 
+                                 sum(status_counts.values()) if status_counts else 0
+            }
+            
+        except Exception as e:
+            print(f"Error getting reconciliation progress: {e}")
+            return {}
+        finally:
+            conn.close()
+    
+    def get_all_categories(self) -> List[Tuple]:
+        """Get all categories with subcategories for reconciliation context"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT c.id, c.name, s.id, s.name
+                FROM categories c
+                LEFT JOIN subcategories s ON c.id = s.category_id
+                ORDER BY c.name, s.name
+            ''')
+            
+            return cursor.fetchall()
+            
+        except Exception as e:
+            print(f"Error getting categories: {e}")
+            return []
+        finally:
+            conn.close()
+    
+    def get_recent_payees(self, limit: int = 100) -> List[str]:
+        """Get recent payees for reconciliation context"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT DISTINCT payee
+                FROM transactions 
+                WHERE payee IS NOT NULL AND payee != ''
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (limit,))
+            
+            return [row[0] for row in cursor.fetchall()]
+            
+        except Exception as e:
+            print(f"Error getting payees: {e}")
+            return []
+        finally:
+            conn.close()
+    
+    def enhance_existing_transaction(self, transaction_id: int, enhancements: Dict, 
+                                   qif_hash: str, notes: str = None) -> bool:
+        """Apply enhancements to an existing transaction and log the changes"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # Get current transaction state for audit
+            cursor.execute('SELECT payee, note, category_id, subcategory_id FROM transactions WHERE id = ?', 
+                          (transaction_id,))
+            current_state = cursor.fetchone()
+            if not current_state:
+                return False
+            
+            current_payee, current_memo, current_cat_id, current_sub_id = current_state
+            
+            # Apply enhancements
+            update_fields = []
+            update_values = []
+            changes_made = {}
+            
+            if 'payee' in enhancements:
+                update_fields.append('payee = ?')
+                update_values.append(enhancements['payee']['to'])
+                changes_made['payee'] = {
+                    'from': current_payee,
+                    'to': enhancements['payee']['to'],
+                    'reason': enhancements['payee']['reason']
+                }
+            
+            if 'memo' in enhancements:
+                update_fields.append('note = ?')  # Assuming note field stores memo
+                update_values.append(enhancements['memo']['to'])
+                changes_made['memo'] = {
+                    'from': current_memo,
+                    'to': enhancements['memo']['to'],
+                    'reason': enhancements['memo']['reason']
+                }
+            
+            if 'category' in enhancements:
+                cat_info = enhancements['category']['to']
+                update_fields.append('category_id = ?')
+                update_values.append(cat_info['app_category_id'])
+                changes_made['category_id'] = {
+                    'from': current_cat_id,
+                    'to': cat_info['app_category_id'],
+                    'reason': enhancements['category']['reason']
+                }
+                
+                if cat_info.get('app_subcategory_id'):
+                    update_fields.append('subcategory_id = ?')
+                    update_values.append(cat_info['app_subcategory_id'])
+                    changes_made['subcategory_id'] = {
+                        'from': current_sub_id,
+                        'to': cat_info['app_subcategory_id'],
+                        'reason': enhancements['category']['reason']
+                    }
+            
+            if not update_fields:
+                return False
+            
+            # Update transaction
+            update_values.append(transaction_id)
+            update_sql = f"UPDATE transactions SET {', '.join(update_fields)} WHERE id = ?"
+            cursor.execute(update_sql, update_values)
+            
+            # Log the enhancement in QIF reconciliation log
+            import json
+            decision_json = json.dumps({
+                'action': 'enhance_existing',
+                'transaction_id': transaction_id,
+                'changes_applied': changes_made,
+                'timestamp': self._get_current_timestamp()
+            })
+            
+            # Get the original transaction date and amount for logging
+            cursor.execute('SELECT run_date, amount FROM transactions WHERE id = ?', (transaction_id,))
+            txn_info = cursor.fetchone()
+            txn_date, txn_amount = txn_info if txn_info else ('1970-01-01', 0.0)
+            
+            cursor.execute('''
+                INSERT INTO qif_reconciliation_log 
+                (qif_file_path, batch_number, qif_transaction_hash, qif_date, 
+                 qif_amount, reconciliation_status, matched_transaction_id, 
+                 import_decision, notes, reconciled_at, reconciled_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+            ''', (
+                'interactive_session',  # qif_file_path
+                1,  # batch_number - we'll track interactive sessions as batch 1
+                qif_hash,
+                txn_date,  # qif_date - use original transaction date
+                txn_amount,  # qif_amount - use original transaction amount
+                'pending',  # reconciliation_status - use 'pending' since 'enhanced' not in constraint
+                transaction_id,  # matched_transaction_id
+                decision_json,  # import_decision
+                notes or f"Enhanced via interactive reconciliation: {', '.join(changes_made.keys())}",  # notes
+                'claude_code_interactive'  # reconciled_by
+            ))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            print(f"Error enhancing transaction {transaction_id}: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+    
+    def _get_current_timestamp(self) -> str:
+        """Get current timestamp in ISO format"""
+        from datetime import datetime
+        return datetime.now().isoformat()
     
     def generate_transaction_hash(self, transaction: Dict) -> str:
         """Generate a unique hash for a transaction to detect duplicates"""
