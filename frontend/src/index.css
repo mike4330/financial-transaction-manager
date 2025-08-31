@@ -1,11 +1,51 @@
+/* Import Inter font for better typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #a9a9a9;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  
+  /* Light mode background */
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+/* Dark mode body styles */
+body.dark {
+  background-color: #0a0806;
+  color: #f5f5f4;
+}
+
+/* Dark mode overrides for existing components */
+.dark .card {
+  background-color: #252017;
+  border: 1px solid #3a2f20;
+  color: #f5f5f4;
+}
+
+.dark .container {
+  background-color: #0a0806;
+  color: #f5f5f4;
+}
+
+/* Dark mode chart containers */
+.dark [class*="_card_"] {
+  background-color: #252017 !important;
+  border: 1px solid #3a2f20 !important;
+  color: #f5f5f4 !important;
+}
+
+/* Dark mode text colors */
+.dark [class*="_title"],
+.dark [class*="_text"] {
+  color: #f5f5f4 !important;
 }
 
 * {
@@ -49,6 +89,112 @@ body {
 
 .text-blue-600 {
   color: #2563eb;
+}
+
+/* Navigation Styles */
+.navigation {
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.nav-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.nav-title {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #111827;
+  margin: 0;
+}
+
+.nav-items {
+  display: flex;
+  gap: 1rem;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: #4b5563;
+  transition: all 0.15s ease;
+}
+
+.nav-item:hover {
+  color: #111827;
+  background-color: #f3f4f6;
+}
+
+.nav-item-active {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.nav-item-active:hover {
+  background-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-stats {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.nav-badge {
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background-color: #fed7aa;
+  color: #9a3412;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+}
+
+.nav-preferences {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #4b5563;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nav-preferences:hover {
+  color: #111827;
+  background-color: #f3f4f6;
 }
 
 .bg-blue-50 {

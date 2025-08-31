@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTimeRange } from '../contexts/TimeRangeContext';
 import { usePreferences } from '../contexts/PreferencesContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { cachedFetch } from '../utils/apiCache';
+import { getGridProps, getAxisProps, getTooltipProps } from '../styles/chartTheme';
 import styles from './StackedChart.module.css';
 
 interface StackedChartProps {
@@ -99,11 +101,17 @@ const StackedChart: React.FC<StackedChartProps> = ({
 }) => {
   const { timeRange, getDateFilter } = useTimeRange();
   const { homePreferences } = usePreferences();
+  const { isDarkMode } = useTheme();
   const [data, setData] = useState<ChartData[]>([]);
   const [subcategories, setSubcategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
+
+  // Get theme-aware chart props
+  const gridProps = getGridProps(isDarkMode);
+  const axisProps = getAxisProps(isDarkMode);
+  const tooltipProps = getTooltipProps(isDarkMode);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -257,15 +265,15 @@ const StackedChart: React.FC<StackedChartProps> = ({
     if (chartType === 'bar') {
       return (
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <CartesianGrid {...gridProps} />
           <XAxis 
             dataKey="period" 
             tickFormatter={formatPeriod}
-            stroke="#666"
+            {...axisProps}
           />
           <YAxis 
             tickFormatter={currency ? formatCurrency : undefined}
-            stroke="#666"
+            {...axisProps}
           />
           <Tooltip 
             formatter={(value: number, name: string) => [
@@ -289,15 +297,15 @@ const StackedChart: React.FC<StackedChartProps> = ({
     } else {
       return (
         <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <CartesianGrid {...gridProps} />
           <XAxis 
             dataKey="period" 
             tickFormatter={formatPeriod}
-            stroke="#666"
+            {...axisProps}
           />
           <YAxis 
             tickFormatter={currency ? formatCurrency : undefined}
-            stroke="#666"
+            {...axisProps}
           />
           <Tooltip 
             formatter={(value: number, name: string) => [

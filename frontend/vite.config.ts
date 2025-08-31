@@ -14,4 +14,19 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+        },
+      },
+    },
+  },
+  // Ensure HTML5 routing works in production
+  preview: {
+    port: 3001,
+    host: '0.0.0.0',
+  },
 })

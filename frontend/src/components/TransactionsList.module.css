@@ -21,6 +21,20 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 0.875rem;
+  background-color: white;
+  color: #111827;
+  transition: all 0.2s ease;
+}
+
+:global(.dark) .searchInput {
+  background-color: #252017;
+  border-color: #3a2f20;
+  color: #f3f4f6;
+}
+
+:global(.dark) .searchInput:focus {
+  border-color: #ed7014;
+  box-shadow: 0 0 0 3px rgba(237, 112, 20, 0.1);
 }
 
 .filterContainer {
@@ -36,6 +50,15 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 0.875rem;
+  background-color: white;
+  color: #111827;
+  transition: all 0.2s ease;
+}
+
+:global(.dark) .categoryFilter {
+  background-color: #252017;
+  border-color: #3a2f20;
+  color: #f3f4f6;
 }
 
 .filterIndicator {
@@ -43,6 +66,10 @@
   font-size: 1rem;
   font-weight: normal;
   margin-left: 0.5rem;
+}
+
+:global(.dark) .filterIndicator {
+  color: #a8a29e;
 }
 
 .clearFiltersButton {
@@ -109,6 +136,13 @@
   padding: 1rem;
   text-align: center;
   border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+:global(.dark) .statCard {
+  background-color: #252017;
+  border-color: #3a2f20;
+  box-shadow: 0 1px 3px rgba(237, 112, 20, 0.1);
 }
 
 .statValue {
@@ -118,9 +152,17 @@
   margin-bottom: 0.25rem;
 }
 
+:global(.dark) .statValue {
+  color: #ed7014;
+}
+
 .statLabel {
   font-size: 0.875rem;
   color: #6b7280;
+}
+
+:global(.dark) .statLabel {
+  color: #a8a29e;
 }
 
 /* Color legend */
@@ -145,6 +187,12 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  transition: all 0.2s ease;
+}
+
+:global(.dark) .bulkActions {
+  background-color: #1a1612;
+  border: 1px solid #3a2f20;
 }
 
 .selectedCount {
@@ -152,11 +200,23 @@
   color: #374151;
 }
 
+:global(.dark) .selectedCount {
+  color: #f3f4f6;
+}
+
 .bulkSelect {
   padding: 0.25rem 0.5rem;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 0.875rem;
+  background-color: white;
+  color: #111827;
+}
+
+:global(.dark) .bulkSelect {
+  background-color: #252017;
+  border-color: #3a2f20;
+  color: #f3f4f6;
 }
 
 /* Bulk categorization flyout menu */
@@ -200,6 +260,12 @@
   overflow: hidden;
 }
 
+:global(.dark) .bulkCategoryMenu {
+  background-color: #252017;
+  border-color: #3a2f20;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
 .bulkMenuHeader {
   display: flex;
   justify-content: space-between;
@@ -208,6 +274,13 @@
   border-bottom: 1px solid #e5e7eb;
   background-color: #f9fafb;
   font-weight: 600;
+  color: #111827;
+}
+
+:global(.dark) .bulkMenuHeader {
+  background-color: #1a1612;
+  border-bottom-color: #3a2f20;
+  color: #f3f4f6;
 }
 
 .bulkMenuClose {
@@ -341,10 +414,20 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
+  background-color: white;
+  transition: all 0.2s ease;
+}
+
+:global(.dark) .table {
+  background-color: #252017;
 }
 
 .tableHeader {
   background-color: #f9fafb;
+}
+
+:global(.dark) .tableHeader {
+  background-color: #1a1612;
 }
 
 .tableHeaderCell {
@@ -353,6 +436,18 @@
   cursor: pointer;
   user-select: none;
   border-bottom: 1px solid #e5e7eb;
+  color: #111827;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+:global(.dark) .tableHeaderCell {
+  border-bottom-color: #3a2f20;
+  color: #f3f4f6;
+}
+
+:global(.dark) .tableHeaderCell:hover {
+  background-color: #2d251a;
 }
 
 .sortIcon {
@@ -361,18 +456,37 @@
 
 .tableRow {
   border-bottom: 1px solid #f3f4f6;
+  transition: all 0.2s ease;
+}
+
+:global(.dark) .tableRow {
+  border-bottom-color: #3a2f20;
 }
 
 .tableRowEven {
   background-color: white;
 }
 
+:global(.dark) .tableRowEven {
+  background-color: #252017;
+}
+
 .tableRowOdd {
   background-color: #fafafa;
 }
 
+:global(.dark) .tableRowOdd {
+  background-color: #1a1612;
+}
+
 .tableCell {
   padding: 0.75rem 0.5rem;
+  color: #111827;
+  transition: all 0.2s ease;
+}
+
+:global(.dark) .tableCell {
+  color: #f3f4f6;
 }
 
 .tableCellAmount {
@@ -406,6 +520,10 @@
   background-color: #f8fafc !important;
 }
 
+:global(.dark) .clickableRow:hover {
+  background-color: #2d251a !important;
+}
+
 .cellWithExpander {
   display: flex;
   justify-content: space-between;
@@ -419,6 +537,10 @@
   margin-left: 0.5rem;
 }
 
+:global(.dark) .expandIcon {
+  color: #a8a29e;
+}
+
 .expandIconOpen {
   transform: rotate(90deg);
 }
@@ -427,6 +549,11 @@
 .expandedRow {
   background-color: #f8fafc;
   border-top: 1px solid #e5e7eb;
+}
+
+:global(.dark) .expandedRow {
+  background-color: #1a1612;
+  border-top-color: #3a2f20;
 }
 
 .expandedContent {
@@ -453,10 +580,18 @@
   flex-shrink: 0;
 }
 
+:global(.dark) .detailLabel {
+  color: #f3f4f6;
+}
+
 .detailValue {
   color: #6b7280;
   word-break: break-word;
   flex: 1;
+}
+
+:global(.dark) .detailValue {
+  color: #a8a29e;
 }
 
 /* Responsive design for expanded rows */
@@ -504,10 +639,18 @@
   background-color: #f3f4f6;
 }
 
+:global(.dark) .noteDisplay:hover {
+  background-color: #3a2f20;
+}
+
 .noteEmpty {
   color: #9ca3af;
   font-style: italic;
   font-size: 0.875rem;
+}
+
+:global(.dark) .noteEmpty {
+  color: #6b7280;
 }
 
 .noteEditContainer {
@@ -524,6 +667,14 @@
   border-radius: 4px;
   font-size: 0.875rem;
   outline: none;
+  background-color: white;
+  color: #111827;
+}
+
+:global(.dark) .noteInput {
+  background-color: #252017;
+  border-color: #ed7014;
+  color: #f3f4f6;
 }
 
 .noteEditActions {
@@ -544,6 +695,14 @@
   border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 0.75rem;
+  background-color: white;
+  color: #111827;
+}
+
+:global(.dark) .categorySelect {
+  background-color: #252017;
+  border-color: #3a2f20;
+  color: #f3f4f6;
 }
 
 .categorySpan {
@@ -582,11 +741,21 @@
 
 .uncategorized {
   background-color: #fef2f2;
+  color: #dc2626;
+}
+
+:global(.dark) .uncategorized {
+  background-color: rgba(220, 38, 38, 0.1);
+  color: #fca5a5;
 }
 
 .subcategorySpanDisabled {
   cursor: not-allowed;
   color: #9ca3af;
+}
+
+:global(.dark) .subcategorySpanDisabled {
+  color: #6b7280;
 }
 
 /* Edit container and actions */
@@ -644,11 +813,20 @@
   padding: 1rem 0;
   border-top: 1px solid #e5e7eb;
   margin-top: 1rem;
+  transition: all 0.2s ease;
+}
+
+:global(.dark) .paginationContainer {
+  border-top-color: #3a2f20;
 }
 
 .paginationInfo {
   color: #6b7280;
   font-size: 0.875rem;
+}
+
+:global(.dark) .paginationInfo {
+  color: #a8a29e;
 }
 
 .paginationControls {
@@ -668,15 +846,31 @@
   transition: all 0.2s;
 }
 
+:global(.dark) .paginationButton {
+  background-color: #252017;
+  border-color: #3a2f20;
+  color: #f3f4f6;
+}
+
 .paginationButton:hover:not(:disabled) {
   background-color: #f9fafb;
   border-color: #9ca3af;
+}
+
+:global(.dark) .paginationButton:hover:not(:disabled) {
+  background-color: #2d251a;
+  border-color: #ed7014;
 }
 
 .paginationButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   background-color: #f9fafb;
+}
+
+:global(.dark) .paginationButton:disabled {
+  background-color: #1a1612;
+  color: #6b7280;
 }
 
 /* Bulk delete button */
@@ -729,6 +923,10 @@
   z-index: 1000;
 }
 
+:global(.dark) .modalOverlay {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
 .confirmationModal {
   background-color: white;
   border-radius: 8px;
@@ -738,6 +936,12 @@
   overflow: hidden;
 }
 
+:global(.dark) .confirmationModal {
+  background-color: #252017;
+  border: 1px solid #3a2f20;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
 .modalHeader {
   padding: 1.5rem 1.5rem 1rem 1.5rem;
   border-bottom: 1px solid #e5e7eb;
@@ -745,11 +949,19 @@
   align-items: center;
 }
 
+:global(.dark) .modalHeader {
+  border-bottom-color: #3a2f20;
+}
+
 .modalHeader h3 {
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
   color: #111827;
+}
+
+:global(.dark) .modalHeader h3 {
+  color: #f3f4f6;
 }
 
 .modalContent {
@@ -762,10 +974,18 @@
   line-height: 1.5;
 }
 
+:global(.dark) .modalContent p {
+  color: #d1d5db;
+}
+
 .warningText {
   color: #dc2626;
   font-weight: 500;
   font-size: 0.875rem;
+}
+
+:global(.dark) .warningText {
+  color: #fca5a5;
 }
 
 .modalActions {
@@ -787,8 +1007,18 @@
   transition: all 0.2s ease;
 }
 
+:global(.dark) .cancelButton {
+  background-color: #1a1612;
+  color: #f3f4f6;
+  border-color: #3a2f20;
+}
+
 .cancelButton:hover {
   background-color: #f3f4f6;
+}
+
+:global(.dark) .cancelButton:hover {
+  background-color: #2d251a;
 }
 
 .deleteButton {
@@ -820,6 +1050,12 @@
   flex-direction: column;
 }
 
+:global(.dark) .exportModal {
+  background-color: #252017;
+  border: 1px solid #3a2f20;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
 .modalCloseButton {
   background: none;
   border: none;
@@ -830,8 +1066,16 @@
   margin-left: auto;
 }
 
+:global(.dark) .modalCloseButton {
+  color: #a8a29e;
+}
+
 .modalCloseButton:hover {
   color: #374151;
+}
+
+:global(.dark) .modalCloseButton:hover {
+  color: #f3f4f6;
 }
 
 .exportPreview {
@@ -841,6 +1085,11 @@
   border-radius: 6px;
   padding: 1rem;
   background-color: #f9fafb;
+}
+
+:global(.dark) .exportPreview {
+  border-color: #3a2f20;
+  background-color: #1a1612;
 }
 
 .exportPreview table {
@@ -854,11 +1103,22 @@
   text-align: left;
   padding: 0.5rem;
   border: 1px solid #d1d5db;
+  color: #111827;
+}
+
+:global(.dark) .exportPreview th,
+:global(.dark) .exportPreview td {
+  border-color: #3a2f20;
+  color: #f3f4f6;
 }
 
 .exportPreview th {
   background-color: #f3f4f6;
   font-weight: 600;
+}
+
+:global(.dark) .exportPreview th {
+  background-color: #2d251a;
 }
 
 .copyButton {

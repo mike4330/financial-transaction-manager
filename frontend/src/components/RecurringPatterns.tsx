@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styles from './RecurringPatterns.module.css';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceDot } from 'recharts';
+import { useTheme } from '../contexts/ThemeContext';
+import { getGridProps, getAxisProps, getTooltipProps } from '../styles/chartTheme';
 
 interface Pattern {
   id?: number;
@@ -82,6 +84,12 @@ const RecurringPatterns: React.FC = () => {
   // Edit pattern state
   const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
   const [editForm, setEditForm] = useState<Partial<Pattern>>({});
+
+  // Theme support for charts
+  const { isDarkMode } = useTheme();
+  const gridProps = getGridProps(isDarkMode);
+  const axisProps = getAxisProps(isDarkMode);
+  const tooltipProps = getTooltipProps(isDarkMode);
   
   // Estimated pattern creation state
   const [showEstimatedModal, setShowEstimatedModal] = useState(false);
@@ -862,7 +870,7 @@ const RecurringPatterns: React.FC = () => {
                       data={balanceProjection.daily_projections.filter((_, i) => i % Math.max(1, Math.ceil(balanceProjection.daily_projections.length / 100)) === 0)}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <CartesianGrid {...gridProps} />
                       <XAxis 
                         dataKey="date" 
                         tickFormatter={(date) => {
@@ -871,13 +879,13 @@ const RecurringPatterns: React.FC = () => {
                           const parsedDate = new Date(year, month - 1, day);
                           return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                         }}
-                        stroke="#6b7280"
                         fontSize={12}
+                        {...axisProps}
                       />
                       <YAxis 
                         tickFormatter={(value) => `$${value.toLocaleString()}`}
-                        stroke="#6b7280"
                         fontSize={12}
+                        {...axisProps}
                       />
                       <Tooltip
                         content={({ active, payload, label }) => {

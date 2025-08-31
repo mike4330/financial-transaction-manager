@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import styles from './TransactionsList.module.css';
 import { usePreferences } from '../contexts/PreferencesContext';
 
@@ -38,6 +39,7 @@ interface TransactionsListProps {
 }
 
 const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) => {
+  const params = useParams<{ category?: string; subcategory?: string }>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -55,8 +57,12 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
   const [sortColumn, setSortColumn] = useState<keyof Transaction>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState(initialFilters?.category || '');
-  const [subcategoryFilter, setSubcategoryFilter] = useState(initialFilters?.subcategory || '');
+  const [categoryFilter, setCategoryFilter] = useState(
+    params.category || initialFilters?.category || ''
+  );
+  const [subcategoryFilter, setSubcategoryFilter] = useState(
+    params.subcategory || initialFilters?.subcategory || ''
+  );
   const [accountFilter, setAccountFilter] = useState('');
   const [availableAccounts, setAvailableAccounts] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);

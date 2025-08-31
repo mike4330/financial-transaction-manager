@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { useTimeRange } from '../contexts/TimeRangeContext';
 import { usePreferences } from '../contexts/PreferencesContext';
+import { useTheme } from '../contexts/ThemeContext';
 import type { ChartConfig } from '../config/chartConfig';
 import { TransactionModal } from './TransactionModal';
+import { getChartTheme, getGridProps, getAxisProps, getTooltipProps } from '../styles/chartTheme';
 
 interface Transaction {
   id: number;
@@ -45,6 +47,13 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
   } | null>(null);
   const { timeRange, getDateFilter, startFromZero } = useTimeRange();
   const { homePreferences } = usePreferences();
+  const { isDarkMode } = useTheme();
+
+  // Get consistent chart theme from centralized theme system
+  const chartTheme = useMemo(() => getChartTheme(isDarkMode), [isDarkMode]);
+  const gridProps = useMemo(() => getGridProps(isDarkMode), [isDarkMode]);
+  const axisProps = useMemo(() => getAxisProps(isDarkMode), [isDarkMode]);
+  const tooltipProps = useMemo(() => getTooltipProps(isDarkMode), [isDarkMode]);
 
   // Helper function to calculate Y-axis domain with padding for non-zero mode
   const getYAxisDomain = (data: any[]) => {
@@ -368,19 +377,24 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
         <ResponsiveContainer width="100%" height="100%">
           {chartType === 'line' ? (
             <LineChart data={data} animationDuration={200}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid {...gridProps} />
               <XAxis 
                 dataKey="month" 
                 angle={-45}
                 textAnchor="end"
                 height={80}
                 fontSize={12}
+                {...axisProps}
               />
               <YAxis 
                 tickFormatter={formatCurrency}
                 domain={getYAxisDomain(data)}
+                {...axisProps}
               />
-              <Tooltip formatter={formatTooltip} />
+              <Tooltip 
+                formatter={formatTooltip}
+                {...tooltipProps}
+              />
               <Line 
                 type="monotone" 
                 dataKey="amount" 
@@ -394,19 +408,24 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
             </LineChart>
           ) : (
             <BarChart data={data} animationDuration={200}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid {...gridProps} />
               <XAxis 
                 dataKey="month" 
                 angle={-45}
                 textAnchor="end"
                 height={80}
                 fontSize={12}
+                {...axisProps}
               />
               <YAxis 
                 tickFormatter={formatCurrency}
                 domain={getYAxisDomain(data)}
+                {...axisProps}
               />
-              <Tooltip formatter={formatTooltip} />
+              <Tooltip 
+                formatter={formatTooltip}
+                {...tooltipProps}
+              />
               <Bar dataKey="amount" fill={config.color} style={{ cursor: 'pointer' }} onClick={handleBarClick} animationDuration={200} />
             </BarChart>
           )}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { useTimeRange } from '../contexts/TimeRangeContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { getGridProps, getAxisProps, getTooltipProps } from '../styles/chartTheme';
 import type { DashboardCard } from '../types/dashboard';
 import { TransactionModal } from './TransactionModal';
 
@@ -38,6 +40,12 @@ export const PercentageChart: React.FC<PercentageChartProps> = ({ card }) => {
     subcategory?: string;
   } | null>(null);
   const { timeRange, getDateFilter, startFromZero } = useTimeRange();
+  const { isDarkMode } = useTheme();
+
+  // Get theme-aware chart props
+  const gridProps = getGridProps(isDarkMode);
+  const axisProps = getAxisProps(isDarkMode);
+  const tooltipProps = getTooltipProps(isDarkMode);
 
   // Helper function to calculate Y-axis domain with padding for non-zero mode
   const getYAxisDomain = (data: any[]) => {
@@ -436,7 +444,7 @@ export const PercentageChart: React.FC<PercentageChartProps> = ({ card }) => {
         <ResponsiveContainer width="100%" height="100%">
           {chartType === 'line' ? (
             <LineChart data={data} animationDuration={200}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid {...gridProps} />
               <XAxis 
                 dataKey="month" 
                 angle={-45}
@@ -462,7 +470,7 @@ export const PercentageChart: React.FC<PercentageChartProps> = ({ card }) => {
             </LineChart>
           ) : (
             <BarChart data={data} animationDuration={200}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid {...gridProps} />
               <XAxis 
                 dataKey="month" 
                 angle={-45}

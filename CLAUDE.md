@@ -172,6 +172,11 @@ cd frontend && npm run dev
 - **Built-in Features**: Recharts handles tooltips, responsive design, and accessibility automatically
 - **Existing Components**: Reference GenericChart.tsx and Budget.tsx for Recharts implementation examples
 
+**CRITICAL Frontend Development Notes:**
+- **App Entry Point**: The actual app entry point is `App.router.tsx` (imported by main.tsx), NOT `App.simple.tsx`. Always modify `App.router.tsx` for global providers, routing, and app structure changes. `App.simple.tsx` is unused legacy code that will cause confusion.
+- **No Emojis in Text UI Elements**: Emojis are BANNED from text content, labels, and UI copy (buttons, form labels, descriptions, etc.). They are acceptable ONLY in navigation items, icons, and decorative elements. Use text descriptions instead of emojis for accessibility and professionalism.
+- **Dark Mode**: The app uses a custom "Midnight Ember" theme with warm amber accents instead of typical blue themes. ThemeProvider must wrap the entire app in App.router.tsx.
+
 ### Database Schema
 
 **Core Tables:**

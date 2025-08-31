@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Budget.module.css';
 import { TransactionModal } from './TransactionModal';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
@@ -67,6 +68,8 @@ interface UnbudgetedData {
 }
 
 const Budget: React.FC = () => {
+  const params = useParams<{ year?: string; month?: string }>();
+  const navigate = useNavigate();
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([]);
   const [totals, setTotals] = useState<BudgetTotals | null>(null);
   const [budgetInfo, setBudgetInfo] = useState<BudgetInfo | null>(null);
@@ -482,12 +485,16 @@ const Budget: React.FC = () => {
   // Navigation functions
   const navigateToPrevious = () => {
     if (currentBudgetIndex < availableMonths.length - 1) {
+      const previousMonth = availableMonths[currentBudgetIndex + 1];
+      navigate(`/budget/${previousMonth.year}/${previousMonth.month}`);
       setCurrentBudgetIndex(currentBudgetIndex + 1);
     }
   };
 
   const navigateToNext = () => {
     if (currentBudgetIndex > 0) {
+      const nextMonth = availableMonths[currentBudgetIndex - 1];
+      navigate(`/budget/${nextMonth.year}/${nextMonth.month}`);
       setCurrentBudgetIndex(currentBudgetIndex - 1);
     }
   };

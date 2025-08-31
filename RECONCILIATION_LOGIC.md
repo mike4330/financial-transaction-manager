@@ -77,9 +77,18 @@ def improved_payee_if_better(qif_txn, existing_txn):
   if existing_payee in ['No Description', '', None]:
     return qif_payee
     
-  # Length-based preference (more descriptive usually better)
-  if len(qif_payee) > len(existing_payee) * 1.5:
-    return qif_payee
+  # SKIP: Location-only enhancements (user preference)
+  if is_location_only_change(existing_payee, qif_payee):
+    return existing_payee  # Keep generic name
+    
+  # Prefer generic merchant names over specific locations  
+  # User preference: "Walmart" over "Walmart #1825 Location"
+  if is_generic_merchant_better(existing_payee, qif_payee):
+    return existing_payee
+    
+  # Account number → Descriptive name
+  if contains_account_numbers(qif_payee):
+    return humanize_account_transfer(qif_payee)
     
   # Fuzzy match - keep existing if very similar, otherwise flag for review
   if fuzzy_match(qif_payee, existing_payee) > 0.85:
@@ -114,11 +123,18 @@ def improved_category_if_better(qif_txn, existing_txn):
 
 ## Example Scenarios
 
-### Scenario 1: Generic → Specific Payee
+### Scenario 1: Generic → Specific Payee (ENHANCE)
 ```
 QIF: "Bjs.Com #5490 800-257-2582 Ma"
 DB:  "No Description"
 → Action: Enhance payee to "BJ's Wholesale" (standardized)
+```
+
+### Scenario 1b: Location-Only Change (SKIP)
+```
+QIF: "Walmart #1825 Location Details"  
+DB:  "Walmart"
+→ Action: Skip enhancement, keep generic name (user preference)
 ```
 
 ### Scenario 2: Missing Memo
