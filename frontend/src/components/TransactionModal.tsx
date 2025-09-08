@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useTheme } from '../contexts/ThemeContext';
 import styles from './TransactionModal.module.css';
 
 interface Transaction {
@@ -55,6 +57,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [editingTransaction, setEditingTransaction] = useState<number | null>(null);
   const [sortColumn, setSortColumn] = useState<keyof Transaction>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const { isDarkMode } = useTheme();
 
   // Fetch data when modal opens
   useEffect(() => {
@@ -239,24 +242,24 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className={styles.overlay}>
-      <div className={styles.modal}>
+  const modalContent = (
+    <div className={`${styles.overlay} ${isDarkMode ? styles.overlayDark : ''}`}>
+      <div className={`${styles.modal} ${isDarkMode ? styles.modalDark : ''}`}>
         {/* Header */}
-        <div className={styles.header}>
+        <div className={`${styles.header} ${isDarkMode ? styles.headerDark : ''}`}>
           <div>
-            <h2 className={styles.title}>
+            <h2 className={`${styles.title} ${isDarkMode ? styles.titleDark : ''}`}>
               {title || 'Transaction Details'}
             </h2>
             {(category || startDate) && (
-              <p className={styles.subtitle}>
+              <p className={`${styles.subtitle} ${isDarkMode ? styles.subtitleDark : ''}`}>
                 {category && subcategory ? `${category}/${subcategory}` : category}
                 {startDate && endDate && ` • ${formatDate(startDate)} - ${formatDate(endDate)}`}
                 {` • ${transactions.length} transactions`}
               </p>
             )}
           </div>
-          <button onClick={onClose} className={styles.closeButton}>
+          <button onClick={onClose} className={`${styles.closeButton} ${isDarkMode ? styles.closeButtonDark : ''}`}>
             ×
           </button>
         </div>
@@ -409,4 +412,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       </div>
     </div>
   );
+
+  // Use portal to render modal at document root level to escape container constraints
+  return createPortal(modalContent, document.body);
 };

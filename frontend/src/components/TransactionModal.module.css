@@ -13,6 +13,11 @@
   padding: 1rem;
 }
 
+/* Dark theme overlay with more opacity */
+.overlayDark {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
 /* Modal container */
 .modal {
   background-color: white;
@@ -25,6 +30,14 @@
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
+/* Dark theme modal - Midnight Ember theme colors */
+.modalDark {
+  background-color: #252017;
+  border: 1px solid #3a2f20;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.8);
+  color: #f5f5f4;
+}
+
 /* Modal header */
 .header {
   padding: 1rem 1.5rem;
@@ -34,16 +47,31 @@
   align-items: center;
 }
 
+/* Dark theme header */
+.headerDark {
+  border-bottom: 1px solid #3a2f20;
+}
+
 .title {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
 }
 
+/* Dark theme title */
+.titleDark {
+  color: #f5f5f4;
+}
+
 .subtitle {
   margin: 0.25rem 0 0 0;
   color: #6b7280;
   font-size: 0.875rem;
+}
+
+/* Dark theme subtitle */
+.subtitleDark {
+  color: #a8a29e;
 }
 
 .closeButton {
@@ -53,6 +81,15 @@
   cursor: pointer;
   color: #6b7280;
   padding: 0.25rem;
+}
+
+/* Dark theme close button */
+.closeButtonDark {
+  color: #a8a29e;
+}
+
+.closeButtonDark:hover {
+  color: #d59b47;
 }
 
 /* Bulk actions bar */
@@ -65,9 +102,20 @@
   gap: 1rem;
 }
 
+/* Dark theme bulk actions */
+.modalDark .bulkActions {
+  background-color: #1c1810;
+  border-bottom: 1px solid #3a2f20;
+}
+
 .selectedCount {
   font-size: 0.875rem;
   color: #374151;
+}
+
+/* Dark theme selected count */
+.modalDark .selectedCount {
+  color: #a8a29e;
 }
 
 .bulkSelect {
@@ -75,6 +123,13 @@
   border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 0.875rem;
+}
+
+/* Dark theme bulk select */
+.modalDark .bulkSelect {
+  background-color: #252017;
+  border: 1px solid #3a2f20;
+  color: #f5f5f4;
 }
 
 /* Modal content */
@@ -113,12 +168,23 @@
   background-color: #f9fafb;
 }
 
+/* Dark theme table header */
+.modalDark .tableHeader {
+  background-color: #1c1810;
+}
+
 .tableHeaderCell {
   padding: 0.75rem 0.5rem;
   text-align: left;
   cursor: pointer;
   user-select: none;
   border-bottom: 1px solid #e5e7eb;
+}
+
+/* Dark theme table header cell */
+.modalDark .tableHeaderCell {
+  border-bottom: 1px solid #3a2f20;
+  color: #f5f5f4;
 }
 
 .sortIcon {
@@ -129,16 +195,36 @@
   border-bottom: 1px solid #f3f4f6;
 }
 
+/* Dark theme table row */
+.modalDark .tableRow {
+  border-bottom: 1px solid #3a2f20;
+}
+
 .tableRowEven {
   background-color: white;
+}
+
+/* Dark theme even rows */
+.modalDark .tableRowEven {
+  background-color: #252017;
 }
 
 .tableRowOdd {
   background-color: #fafafa;
 }
 
+/* Dark theme odd rows */
+.modalDark .tableRowOdd {
+  background-color: #2a231b;
+}
+
 .tableCell {
   padding: 0.75rem 0.5rem;
+}
+
+/* Dark theme table cell */
+.modalDark .tableCell {
+  color: #f5f5f4;
 }
 
 .tableCellAmount {
@@ -176,6 +262,13 @@
   font-size: 0.75rem;
 }
 
+/* Dark theme category select */
+.modalDark .categorySelect {
+  background-color: #252017;
+  border: 1px solid #3a2f20;
+  color: #f5f5f4;
+}
+
 .categorySpan {
   cursor: pointer;
   padding: 0.25rem;
@@ -186,11 +279,27 @@
   background-color: #f3f4f6;
 }
 
+/* Dark theme categorized */
+.modalDark .categorized {
+  background-color: #3a2f20;
+}
+
 .uncategorized {
   background-color: #fef2f2;
+}
+
+/* Dark theme uncategorized */
+.modalDark .uncategorized {
+  background-color: #451a03;
+  color: #fed7aa;
 }
 
 .subcategorySpanDisabled {
   cursor: not-allowed;
   color: #9ca3af;
+}
+
+/* Dark theme disabled subcategory */
+.modalDark .subcategorySpanDisabled {
+  color: #6b7280;
 }

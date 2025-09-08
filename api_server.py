@@ -8,6 +8,9 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import sqlite3
 import logging
+import threading
+import signal
+import sys
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -63,9 +66,15 @@ def log_response_info(response):
     return response
 
 DATABASE_PATH = "transactions.db"
+TRANSACTIONS_DIR = "./transactions"
 
 # Global database instance to avoid re-initialization
 _db_instance = None
+
+# Global file monitor instance
+_file_monitor = None
+_monitor_thread = None
+_shutdown_event = threading.Event()
 
 def get_transaction_db():
     """Get a shared TransactionDB instance to avoid re-initialization"""
@@ -83,11 +92,186 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row  # Return rows as dictionaries
     return conn
 
+def start_file_monitoring():
+    """Start file monitoring in a separate thread"""
+    global _file_monitor, _monitor_thread
+    
+    if _monitor_thread and _monitor_thread.is_alive():
+        logger.info("File monitoring is already running")
+        return
+    
+    try:
+        from file_monitor import FileMonitor
+        from database import TransactionDB
+        
+        # Ensure transactions directory exists
+        if not os.path.exists(TRANSACTIONS_DIR):
+            os.makedirs(TRANSACTIONS_DIR)
+            logger.info(f"Created transactions directory: {TRANSACTIONS_DIR}")
+        
+        # Initialize database and file monitor with post-processing enabled
+        db = get_transaction_db()
+        _file_monitor = FileMonitor(TRANSACTIONS_DIR, db, auto_process=True, enable_post_processing=True)
+        
+        def monitor_worker():
+            """Worker function to run file monitoring"""
+            try:
+                logger.info(f"Starting file monitoring thread for {TRANSACTIONS_DIR}")
+                
+                # Process existing files first
+                stats = _file_monitor.process_existing_files()
+                if stats['processed'] > 0:
+                    logger.info(f"Processed {stats['processed']} existing transactions on startup")
+                
+                # Start monitoring
+                _file_monitor.start_monitoring()
+                
+            except Exception as e:
+                logger.error(f"File monitoring thread error: {e}")
+            finally:
+                logger.info("File monitoring thread stopped")
+        
+        _monitor_thread = threading.Thread(target=monitor_worker, daemon=True, name="FileMonitor")
+        _monitor_thread.start()
+        
+        logger.info("File monitoring thread started successfully")
+        
+    except Exception as e:
+        logger.error(f"Failed to start file monitoring: {e}")
+
+def stop_file_monitoring():
+    """Stop file monitoring"""
+    global _file_monitor, _monitor_thread
+    
+    if _file_monitor:
+        logger.info("Stopping file monitoring...")
+        _file_monitor.stop_monitoring()
+        _file_monitor = None
+    
+    if _monitor_thread and _monitor_thread.is_alive():
+        logger.info("Waiting for monitor thread to finish...")
+        _monitor_thread.join(timeout=5)
+        if _monitor_thread.is_alive():
+            logger.warning("Monitor thread did not stop gracefully")
+        else:
+            logger.info("Monitor thread stopped")
+    
+    _monitor_thread = None
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals"""
+    logger.info(f"Received signal {signum}, shutting down gracefully...")
+    _shutdown_event.set()
+    stop_file_monitoring()
+    sys.exit(0)
+
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
+    return jsonify({
+        "status": "healthy", 
+        "timestamp": datetime.now().isoformat(),
+        "file_monitoring": _monitor_thread.is_alive() if _monitor_thread else False
+    })
+
+@app.route('/api/file-monitoring', methods=['GET'])
+def get_file_monitoring_status():
+    """Get file monitoring status"""
+    try:
+        status = {
+            "enabled": _monitor_thread.is_alive() if _monitor_thread else False,
+            "watch_directory": TRANSACTIONS_DIR,
+            "thread_name": _monitor_thread.name if _monitor_thread else None
+        }
+        
+        # Check if transactions directory exists
+        status["directory_exists"] = os.path.exists(TRANSACTIONS_DIR)
+        
+        # Count CSV files in directory
+        if status["directory_exists"]:
+            csv_files = [f for f in os.listdir(TRANSACTIONS_DIR) if f.lower().endswith('.csv')]
+            status["csv_files_in_directory"] = len(csv_files)
+        else:
+            status["csv_files_in_directory"] = 0
+        
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"Error getting file monitoring status: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/file-monitoring/start', methods=['POST'])
+def start_monitoring_endpoint():
+    """Start file monitoring"""
+    try:
+        if _monitor_thread and _monitor_thread.is_alive():
+            return jsonify({
+                "message": "File monitoring is already running",
+                "status": "already_running"
+            })
+        
+        start_file_monitoring()
+        
+        return jsonify({
+            "message": "File monitoring started successfully",
+            "watch_directory": TRANSACTIONS_DIR,
+            "status": "started"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error starting file monitoring: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/file-monitoring/stop', methods=['POST'])
+def stop_monitoring_endpoint():
+    """Stop file monitoring"""
+    try:
+        if not _monitor_thread or not _monitor_thread.is_alive():
+            return jsonify({
+                "message": "File monitoring is not running",
+                "status": "not_running"
+            })
+        
+        stop_file_monitoring()
+        
+        return jsonify({
+            "message": "File monitoring stopped successfully",
+            "status": "stopped"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error stopping file monitoring: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/file-monitoring/process-existing', methods=['POST'])
+def process_existing_files():
+    """Process existing CSV files in the transactions directory"""
+    try:
+        from file_monitor import FileMonitor
+        
+        if not os.path.exists(TRANSACTIONS_DIR):
+            return jsonify({
+                "error": f"Transactions directory does not exist: {TRANSACTIONS_DIR}"
+            }), 404
+        
+        db = get_transaction_db()
+        monitor = FileMonitor(TRANSACTIONS_DIR, db, auto_process=False, enable_post_processing=True)
+        stats = monitor.process_existing_files()
+        
+        return jsonify({
+            "message": "Processing completed",
+            "stats": {
+                "files_processed": stats['files'],
+                "new_transactions": stats['processed'],
+                "duplicates_skipped": stats['duplicates'],
+                "errors": stats['errors']
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error processing existing files: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/transactions', methods=['GET'])
 def get_transactions():
@@ -2184,24 +2368,41 @@ def apply_payee_pattern(pattern_id: int):
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    logger.info("🚀 Starting Flask API Server...")
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    logger.info("🚀 Starting Flask API Server with File Monitoring...")
     logger.info("📊 API will be available at http://localhost:5000")
     logger.info("🔗 Health check: http://localhost:5000/api/health")
     logger.info("📋 Transactions: http://localhost:5000/api/transactions")
     logger.info("💰 Budget: http://localhost:5000/api/budget/2025/8")
+    logger.info("📁 File monitoring: http://localhost:5000/api/file-monitoring")
     logger.info("🛑 Press Ctrl+C to stop")
     
-    print("🚀 Starting Flask API Server...")
+    print("🚀 Starting Flask API Server with File Monitoring...")
     print("📊 API will be available at http://localhost:5000")
     print("🔗 Health check: http://localhost:5000/api/health")
     print("📋 Transactions: http://localhost:5000/api/transactions")
     print("💰 Budget: http://localhost:5000/api/budget/2025/8")
+    print("📁 File monitoring: http://localhost:5000/api/file-monitoring")
     print("🛑 Press Ctrl+C to stop")
     
+    # Start file monitoring automatically
     try:
-        app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=True)
+        start_file_monitoring()
+        logger.info("✅ File monitoring started automatically")
+    except Exception as e:
+        logger.error(f"⚠️  Failed to start file monitoring: {e}")
+        print(f"⚠️  File monitoring disabled due to error: {e}")
+    
+    try:
+        # Note: use_reloader=False to prevent conflicts with background threads
+        app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False)
     except KeyboardInterrupt:
         logger.info("Flask server stopped by user")
+        stop_file_monitoring()
     except Exception as e:
         logger.error(f"Flask server error: {e}")
+        stop_file_monitoring()
         raise
