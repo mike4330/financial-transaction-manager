@@ -226,7 +226,7 @@
 
 .bulkCategoryButton {
   padding: 0.5rem 1rem;
-  background-color: #3b82f6;
+  background-color: #f59e0b;
   color: white;
   border: none;
   border-radius: 6px;
@@ -239,10 +239,18 @@
   gap: 0.5rem;
 }
 
+:global(.dark) .bulkCategoryButton {
+  background-color: #ed7014;
+}
+
 .bulkCategoryButton:hover {
-  background-color: #2563eb;
+  background-color: #d97706;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+:global(.dark) .bulkCategoryButton:hover {
+  background-color: #c2410c;
 }
 
 .bulkCategoryMenu {
@@ -272,15 +280,15 @@
   align-items: center;
   padding: 1rem;
   border-bottom: 1px solid #e5e7eb;
-  background-color: #f9fafb;
+  background-color: #fef3c7;
   font-weight: 600;
-  color: #111827;
+  color: #92400e;
 }
 
 :global(.dark) .bulkMenuHeader {
   background-color: #1a1612;
   border-bottom-color: #3a2f20;
-  color: #f3f4f6;
+  color: #fbbf24;
 }
 
 .bulkMenuClose {
@@ -288,12 +296,20 @@
   border: none;
   font-size: 1.25rem;
   cursor: pointer;
-  color: #6b7280;
+  color: #92400e;
   padding: 0.25rem;
 }
 
 .bulkMenuClose:hover {
-  color: #374151;
+  color: #78350f;
+}
+
+:global(.dark) .bulkMenuClose {
+  color: #fbbf24;
+}
+
+:global(.dark) .bulkMenuClose:hover {
+  color: #f59e0b;
 }
 
 .bulkMenuContent {
@@ -316,9 +332,13 @@
   margin: 0 0 0.75rem 0;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: #92400e;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+:global(.dark) .bulkMenuSection h4 {
+  color: #fbbf24;
 }
 
 .bulkCategoryItem {
@@ -333,23 +353,48 @@
   cursor: pointer;
   font-size: 0.875rem;
   transition: all 0.2s ease;
+  color: #374151;
+}
+
+:global(.dark) .bulkCategoryItem {
+  background-color: #252017;
+  border-color: #3a2f20;
+  color: #f3f4f6;
 }
 
 .bulkCategoryItem:hover {
-  background-color: #f9fafb;
-  border-color: #d1d5db;
+  background-color: #fef3c7;
+  border-color: #fbbf24;
+  color: #92400e;
+}
+
+:global(.dark) .bulkCategoryItem:hover {
+  background-color: #2d251a;
+  border-color: #ed7014;
+  color: #fbbf24;
 }
 
 .bulkCategorySelected {
-  background-color: #dbeafe !important;
-  border-color: #3b82f6 !important;
-  color: #1d4ed8;
+  background-color: #fef3c7 !important;
+  border-color: #f59e0b !important;
+  color: #92400e !important;
   font-weight: 500;
+}
+
+:global(.dark) .bulkCategorySelected {
+  background-color: #2d251a !important;
+  border-color: #ed7014 !important;
+  color: #fbbf24 !important;
 }
 
 .bulkSubcategoryList {
   border-left: 1px solid #e5e7eb;
-  background-color: #f9fafb;
+  background-color: #fffbeb;
+}
+
+:global(.dark) .bulkSubcategoryList {
+  border-left-color: #3a2f20;
+  background-color: #1a1612;
 }
 
 .bulkSubcategoryItem {
@@ -364,12 +409,23 @@
   cursor: pointer;
   font-size: 0.875rem;
   transition: all 0.2s ease;
+  color: #374151;
+}
+
+:global(.dark) .bulkSubcategoryItem {
+  background-color: #252017;
+  border-color: #3a2f20;
+  color: #f3f4f6;
 }
 
 .bulkSubcategoryItem:hover {
-  background-color: #3b82f6;
+  background-color: #f59e0b;
   color: white;
   transform: translateX(2px);
+}
+
+:global(.dark) .bulkSubcategoryItem:hover {
+  background-color: #ed7014;
 }
 
 /* Responsive design for smaller screens */
