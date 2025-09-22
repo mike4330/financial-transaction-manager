@@ -4,15 +4,17 @@ Flask API Server for Financial Transaction Management
 Separate from main.py - provides REST API for React frontend
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, flash, redirect
 from flask_cors import CORS
 import sqlite3
 import logging
 import threading
 import signal
 import sys
+import os
 from datetime import datetime
 from typing import Dict, List, Optional
+from werkzeug.utils import secure_filename
 
 # Configure logging
 import os
@@ -1048,92 +1050,100 @@ def get_monthly_spending_by_category(year: int, month: int):
 
 @app.route('/api/budget/<int:year>/<int:month>/unbudgeted-categories', methods=['GET'])
 def get_unbudgeted_categories(year: int, month: int):
-    """Get categories that have spending but no budget line item for the given month"""
+    """Get categories and subcategories that have spending but no budget line item for the given month"""
     try:
         conn = get_db_connection()
-        
-        # Calculate date range for the month (same format as pie chart)
+
+        # Calculate date range for the month
         start_date = f"{year}-{month:02d}-01"
         if month == 12:
             end_date = f"{year + 1}-01-01"
         else:
             end_date = f"{year}-{month + 1:02d}-01"
-        
-        # Get all spending categories (exact same query as pie chart)
+
+        # Get all spending by category/subcategory combinations
         spending_query = conn.execute('''
-            SELECT c.name as category, 
+            SELECT c.name as category,
+                   s.name as subcategory,
                    SUM(ABS(t.amount)) as total_spent,
                    COUNT(t.id) as transaction_count
             FROM transactions t
             JOIN categories c ON t.category_id = c.id
+            LEFT JOIN subcategories s ON t.subcategory_id = s.id
             WHERE t.run_date >= ? AND t.run_date < ?
             AND t.amount < 0  -- Only expenses (negative amounts)
             AND c.name NOT IN ('Banking', 'Investment', 'Transfer')  -- Exclude transfers/investments
-            GROUP BY c.id, c.name
+            GROUP BY c.id, c.name, s.id, s.name
             HAVING total_spent > 0
-            ORDER BY total_spent DESC
+            ORDER BY c.name, s.name
         ''', (start_date, end_date)).fetchall()
-        
-        # Build spending dictionary
-        spending_categories = {}
-        total_spending = 0
-        for row in spending_query:
-            spending_categories[row['category']] = {
-                'amount': float(row['total_spent']),
-                'transaction_count': row['transaction_count']
-            }
-            total_spending += row['total_spent']
-        
-        # Get all budgeted categories for this month
+
+        # Get all budgeted category/subcategory combinations for this month
         budgeted_query = conn.execute('''
-            SELECT DISTINCT c.name as category
+            SELECT c.name as category, s.name as subcategory
             FROM monthly_budget_items mbi
             JOIN monthly_budgets mb ON mbi.monthly_budget_id = mb.id
             JOIN categories c ON mbi.category_id = c.id
+            LEFT JOIN subcategories s ON mbi.subcategory_id = s.id
             WHERE mb.budget_year = ? AND mb.budget_month = ?
         ''', (year, month)).fetchall()
-        
-        # Build budgeted set
-        budgeted_categories = {row['category'] for row in budgeted_query}
-        
-        conn.close()
-        
-        # Debug output
-        print(f"DEBUG: Spending categories: {list(spending_categories.keys())}")
-        print(f"DEBUG: Budgeted categories: {list(budgeted_categories)}")
-        
-        # Find unbudgeted categories by set difference
-        unbudgeted_category_names = set(spending_categories.keys()) - budgeted_categories
-        print(f"DEBUG: Unbudgeted categories: {list(unbudgeted_category_names)}")
-        
-        # Build result
-        categories = []
+
+        # Build budgeted set using category|subcategory keys
+        budgeted_combinations = set()
+        for row in budgeted_query:
+            key = f"{row['category']}|{row['subcategory'] or ''}"
+            budgeted_combinations.add(key)
+
+        # Find unbudgeted spending combinations
+        unbudgeted_items = []
         total_unbudgeted = 0
-        
-        for category_name in unbudgeted_category_names:
-            spending_data = spending_categories[category_name]
-            percentage = (spending_data['amount'] / total_spending * 100) if total_spending > 0 else 0
-            
-            category_data = {
-                "category": category_name,
-                "amount": spending_data['amount'],
-                "percentage": percentage,
-                "transaction_count": spending_data['transaction_count']
-            }
-            categories.append(category_data)
-            total_unbudgeted += spending_data['amount']
-        
+        total_spending = 0
+
+        for row in spending_query:
+            total_spending += row['total_spent']
+
+            # Create key for this spending combination
+            spending_key = f"{row['category']}|{row['subcategory'] or ''}"
+
+            # Check if this exact combination is budgeted
+            if spending_key not in budgeted_combinations:
+                percentage = (row['total_spent'] / total_spending * 100) if total_spending > 0 else 0
+
+                # Format display name
+                if row['subcategory']:
+                    display_name = f"{row['category']} - {row['subcategory']}"
+                else:
+                    display_name = row['category']
+
+                unbudgeted_item = {
+                    "category": row['category'],
+                    "subcategory": row['subcategory'],
+                    "display_name": display_name,
+                    "amount": float(row['total_spent']),
+                    "percentage": percentage,
+                    "transaction_count": row['transaction_count']
+                }
+                unbudgeted_items.append(unbudgeted_item)
+                total_unbudgeted += row['total_spent']
+
+        conn.close()
+
         # Sort by amount descending
-        categories.sort(key=lambda x: x['amount'], reverse=True)
-        
+        unbudgeted_items.sort(key=lambda x: x['amount'], reverse=True)
+
+        # Debug output
+        logger.info(f"Found {len(unbudgeted_items)} unbudgeted category/subcategory combinations for {year}-{month:02d}")
+        for item in unbudgeted_items[:5]:  # Log first 5
+            logger.info(f"  Unbudgeted: {item['display_name']} - ${item['amount']:.2f}")
+
         return jsonify({
             "year": year,
             "month": month,
-            "categories": categories,
-            "total_unbudgeted": total_unbudgeted,
-            "count": len(categories)
+            "categories": unbudgeted_items,
+            "total_unbudgeted": float(total_unbudgeted),
+            "count": len(unbudgeted_items)
         })
-        
+
     except Exception as e:
         logger.error(f"Error fetching unbudgeted categories: {e}")
         return jsonify({"error": str(e)}), 500
@@ -2269,11 +2279,10 @@ def apply_payee_pattern(pattern_id: int):
         is_regex = bool(pattern_row['is_regex'])
         pattern_name = pattern_row['name']
         
-        # Find matching transactions with "No Description" or NULL payee
+        # Find matching transactions from all transactions (not just missing payees)
         cursor.execute('''
             SELECT id, action, payee, run_date, account, amount
-            FROM transactions 
-            WHERE (payee = 'No Description' OR payee IS NULL)
+            FROM transactions
             ORDER BY id DESC
             LIMIT 1000
         ''')
@@ -2365,6 +2374,53 @@ def apply_payee_pattern(pattern_id: int):
         
     except Exception as e:
         logger.error(f"Error applying payee pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/upload-csv', methods=['POST'])
+def upload_csv_file():
+    """Handle CSV file upload to transactions directory"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+
+        # Validate file extension
+        if not file.filename.lower().endswith('.csv'):
+            return jsonify({"error": "Only CSV files are allowed"}), 400
+
+        # Secure the filename
+        filename = secure_filename(file.filename)
+        if not filename:
+            return jsonify({"error": "Invalid filename"}), 400
+
+        # Ensure transactions directory exists
+        if not os.path.exists(TRANSACTIONS_DIR):
+            os.makedirs(TRANSACTIONS_DIR)
+            logger.info(f"Created transactions directory: {TRANSACTIONS_DIR}")
+
+        # Save the file
+        filepath = os.path.join(TRANSACTIONS_DIR, filename)
+        file.save(filepath)
+
+        # Log the upload
+        logger.info(f"CSV file uploaded: {filename} ({os.path.getsize(filepath)} bytes)")
+
+        # If file monitoring is active, it should automatically process this file
+        monitoring_active = _monitor_thread and _monitor_thread.is_alive()
+
+        return jsonify({
+            "message": f"File '{filename}' uploaded successfully",
+            "filename": filename,
+            "size": os.path.getsize(filepath),
+            "monitoring_active": monitoring_active,
+            "auto_processing": monitoring_active
+        })
+
+    except Exception as e:
+        logger.error(f"Error uploading CSV file: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
