@@ -65,6 +65,8 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
   );
   const [accountFilter, setAccountFilter] = useState('');
   const [availableAccounts, setAvailableAccounts] = useState<string[]>([]);
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState('');
+  const [availableTransactionTypes, setAvailableTransactionTypes] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalTransactions, setTotalTransactions] = useState(0);
@@ -81,7 +83,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
     fetchData();
     // Collapse all rows when data changes (page, filters, sorting, etc.)
     setExpandedRows(new Set());
-  }, [currentPage, searchTerm, categoryFilter, subcategoryFilter, accountFilter, sortColumn, sortDirection, transactionsPreferences.hideInvestments]);
+  }, [currentPage, searchTerm, categoryFilter, subcategoryFilter, accountFilter, transactionTypeFilter, sortColumn, sortDirection, transactionsPreferences.hideInvestments]);
 
   // Close bulk menu when clicking outside
   useEffect(() => {
@@ -129,6 +131,11 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
         params.append('account', accountFilter);
       }
 
+      // Add transaction type filter
+      if (transactionTypeFilter) {
+        params.append('type', transactionTypeFilter);
+      }
+
       // Add investment exclusion filter based on preferences
       if (transactionsPreferences.hideInvestments) {
         params.append('exclude_investments', 'true');
@@ -158,6 +165,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
       setCategories(categoriesResult.categories || []);
       setSubcategories(categoriesResult.subcategories || []);
       setAvailableAccounts(filtersResult.accounts || []);
+      setAvailableTransactionTypes(filtersResult.transaction_types || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
@@ -199,11 +207,17 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
     setCurrentPage(1); // Reset to first page when filtering
   };
 
+  const handleTransactionTypeFilter = (transactionType: string) => {
+    setTransactionTypeFilter(transactionType);
+    setCurrentPage(1); // Reset to first page when filtering
+  };
+
   const handleClearFilters = () => {
     setSearchTerm('');
     setCategoryFilter('');
     setSubcategoryFilter('');
     setAccountFilter('');
+    setTransactionTypeFilter('');
     setCurrentPage(1); // Reset to first page when clearing filters
   };
 
@@ -514,11 +528,12 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
     <div className="container">
       <h1 className="text-3xl mb-6">
         All Transactions
-        {(categoryFilter || subcategoryFilter || accountFilter) && (
+        {(categoryFilter || subcategoryFilter || accountFilter || transactionTypeFilter) && (
           <span className={styles.filterIndicator}>
             {accountFilter && ` • ${accountFilter}`}
             {categoryFilter && ` • ${categoryFilter}`}
             {subcategoryFilter && ` • ${subcategoryFilter}`}
+            {transactionTypeFilter && ` • ${transactionTypeFilter}`}
           </span>
         )}
       </h1>
@@ -569,6 +584,18 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
                 <option key={sub.id} value={sub.name}>{sub.name}</option>
               ))}
           </select>
+          {!transactionsPreferences.hideInvestments && (
+            <select
+              value={transactionTypeFilter}
+              onChange={(e) => handleTransactionTypeFilter(e.target.value)}
+              className={styles.categoryFilter}
+            >
+              <option value="">All Transaction Types</option>
+              {availableTransactionTypes.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          )}
           <button
             onClick={handleClearFilters}
             className={styles.clearFiltersButton}

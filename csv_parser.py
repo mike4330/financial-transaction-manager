@@ -55,8 +55,13 @@ class CSVParser:
         """Extract payee name from action column and optionally description"""
         if not action:
             return None
-        
+
         action_upper = action.upper().strip()
+
+        # First check custom payee patterns from database
+        custom_payee = self._apply_custom_payee_patterns(action)
+        if custom_payee:
+            return custom_payee
         
         # Pattern 1: Direct debit patterns like "DIRECT DEBIT STATE FARM RO SFPP (Cash)"
         direct_debit_match = re.search(r'DIRECT DEBIT\s+([A-Z][A-Z0-9\s&.]+?)(?:\s+[A-Z]{2,3}\s+[A-Z0-9]+|\s*\([^)]+\)|$)', action_upper)
@@ -142,7 +147,80 @@ class CSVParser:
                 return self._clean_payee_name(payee)
         
         return None
-    
+
+    def _apply_custom_payee_patterns(self, action: str) -> Optional[str]:
+        """Apply custom payee extraction patterns from database"""
+        if not hasattr(self, 'db') or not self.db:
+            return None
+
+        try:
+            import sqlite3
+            conn = sqlite3.connect(self.db.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT pattern, replacement, is_regex
+                FROM payee_extraction_patterns
+                WHERE is_active = 1
+                ORDER BY usage_count DESC
+            ''')
+            patterns = cursor.fetchall()
+
+            for pattern_row in patterns:
+                pattern = pattern_row['pattern']
+                replacement = pattern_row['replacement']
+                is_regex = bool(pattern_row['is_regex'])
+
+                if is_regex:
+                    # Regex pattern matching
+                    try:
+                        match = re.search(pattern, action, re.IGNORECASE)
+                        if match:
+                            # Handle capture group substitution ($1, $2, etc.)
+                            result = replacement
+                            for i, group in enumerate(match.groups(), 1):
+                                if group:
+                                    result = result.replace(f'${i}', group)
+
+                            # Update usage count
+                            cursor.execute('''
+                                UPDATE payee_extraction_patterns
+                                SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP
+                                WHERE pattern = ? AND replacement = ?
+                            ''', (pattern, replacement))
+                            conn.commit()
+                            conn.close()
+
+                            return result.strip()
+                    except re.error:
+                        self.logger.warning(f"Invalid regex pattern: {pattern}")
+                        continue
+                else:
+                    # Simple text matching (case-insensitive)
+                    if pattern.upper() in action.upper():
+                        # Update usage count
+                        cursor.execute('''
+                            UPDATE payee_extraction_patterns
+                            SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP
+                            WHERE pattern = ? AND replacement = ?
+                        ''', (pattern, replacement))
+                        conn.commit()
+                        conn.close()
+
+                        return replacement.strip()
+
+            # Close connection if no patterns matched
+            conn.close()
+
+        except Exception as e:
+            self.logger.warning(f"Error applying custom payee patterns: {e}")
+            try:
+                conn.close()
+            except:
+                pass
+
+        return None
+
     def _clean_payee_name(self, payee: str) -> str:
         """Clean and standardize payee names"""
         if not payee:
@@ -369,6 +447,11 @@ class CSVParser:
                     if 'OUTSTAND AUTH' in action.upper():
                         self.logger.debug(f"Skipping row {row_num}: contains OUTSTAND AUTH")
                         continue
+
+                    # Skip Fidelity's uncleared transaction indicators
+                    if description.strip() == '(Cash)' and 'DEBIT CARD PURCHASE' in action.upper():
+                        self.logger.debug(f"Skipping row {row_num}: uncleared debit card transaction (Cash)")
+                        continue
                     
                     # Normalize account information (handle missing Account columns)
                     raw_account = (row.get('Account') or '').strip()
@@ -431,7 +514,7 @@ class CSVParser:
                         cat_id, sub_id, confidence, cat_name, sub_name = pattern_match
                         transaction['category_id'] = cat_id
                         transaction['subcategory_id'] = sub_id
-                        transaction['note'] = f"Auto-classified from pattern (confidence: {confidence:.2f})"
+                        # Remove auto-classification note injection
                         self.logger.info(f"Auto-classified transaction as {cat_name}/{sub_name} (confidence: {confidence:.2f})")
                     
                     transactions.append(transaction)

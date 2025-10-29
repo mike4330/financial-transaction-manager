@@ -338,15 +338,28 @@ class ReconciliationSession:
         """Analyze what enhancements can be made to existing transaction"""
         enhancements = {}
         
-        # Payee enhancement
-        qif_payee = qif_txn.get('payee', '').strip()
-        existing_payee = existing_txn.get('payee', '').strip()
-        
-        if self._should_enhance_payee(qif_payee, existing_payee):
+        # Payee enhancement with simplification preferences
+        qif_payee = (qif_txn.get('payee') or '').strip()
+        existing_payee = (existing_txn.get('payee') or '').strip()
+
+        # Apply user preferences for payee simplification
+        preferred_payee = self._apply_payee_simplification(qif_payee, existing_payee)
+
+        # Check if we should enhance based on simplified preferences
+        if preferred_payee and preferred_payee != existing_payee:
+            # Determine the reason based on the type of change
+            if preferred_payee in ['Aldi', 'Walmart', 'Target', 'Costco', 'Sam\'s Club', 'BJ\'s',
+                                 'Food Lion', 'Kroger', 'McDonald\'s', 'KFC', 'CVS', 'Walgreens']:
+                reason = 'Simplified to generic chain name (user preference)'
+            elif len(preferred_payee) < len(qif_payee):
+                reason = 'Applied payee extraction pattern'
+            else:
+                reason = 'QIF payee is more descriptive'
+
             enhancements['payee'] = {
                 'from': existing_payee,
-                'to': qif_payee,
-                'reason': 'QIF payee is more descriptive'
+                'to': preferred_payee,
+                'reason': reason
             }
         
         # Memo enhancement
@@ -360,15 +373,29 @@ class ReconciliationSession:
                 'reason': 'QIF provides memo, existing has none'
             }
         
-        # Category enhancement (if existing is uncategorized)
-        if not existing_txn.get('category_id') and qif_txn.get('category'):
-            mapped_category = self._map_quicken_category(qif_txn['category'])
+        # Category enhancement
+        qif_category = qif_txn.get('category')
+        existing_cat_id = existing_txn.get('category_id')
+
+        if qif_category:
+            mapped_category = self._map_quicken_category(qif_category)
             if mapped_category:
-                enhancements['category'] = {
-                    'from': None,
-                    'to': mapped_category,
-                    'reason': 'QIF provides category, existing is uncategorized'
-                }
+                # Case 1: Existing is uncategorized
+                if not existing_cat_id:
+                    enhancements['category'] = {
+                        'from': None,
+                        'to': mapped_category,
+                        'reason': 'QIF provides category, existing is uncategorized'
+                    }
+                # Case 2: QIF is transfer but existing is not transfer category
+                elif qif_category.startswith('[') and qif_category.endswith(']'):
+                    # This is a transfer - should be categorized as transfer/cash management
+                    if not self._is_transfer_category(existing_cat_id):
+                        enhancements['category'] = {
+                            'from': existing_cat_id,
+                            'to': mapped_category,
+                            'reason': 'QIF shows transfer, correcting miscategorized transaction'
+                        }
         
         return enhancements
     
@@ -391,17 +418,227 @@ class ReconciliationSession:
             return True
             
         return False
-    
+
+    def _is_transfer_category(self, category_id: int) -> bool:
+        """Check if existing category is transfer/cash management related"""
+        if not category_id:
+            return False
+
+        try:
+            conn = sqlite3.connect(self.db.db_path)
+            cursor = conn.cursor()
+
+            # Check if it's a transfer-related category by name patterns
+            cursor.execute('''
+                SELECT c.name, s.name
+                FROM categories c
+                LEFT JOIN subcategories s ON s.id = ?
+                WHERE c.id = (
+                    SELECT category_id FROM subcategories WHERE id = ?
+                    UNION
+                    SELECT ? WHERE ? NOT IN (SELECT id FROM subcategories)
+                )
+            ''', (category_id, category_id, category_id, category_id))
+
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                category_name = result[0] or ''
+                subcategory_name = result[1] or ''
+                full_name = f"{category_name}:{subcategory_name}".lower()
+
+                # Common transfer/cash management category patterns
+                transfer_patterns = [
+                    'transfer', 'cash management', 'account transfer',
+                    'internal transfer', 'money movement', 'cash', 'bank transfer'
+                ]
+
+                # More specific patterns for transfers (not just any banking)
+                specific_transfer_patterns = [
+                    ':transfer', 'transfer:', 'cash management'
+                ]
+
+                return (any(pattern in full_name for pattern in transfer_patterns) or
+                        any(pattern in full_name for pattern in specific_transfer_patterns))
+
+        except Exception:
+            pass
+
+        return False
+
+    def _apply_payee_simplification(self, qif_payee: str, existing_payee: str) -> str:
+        """Apply user preferences for payee simplification, especially for chain establishments"""
+        if not qif_payee:
+            return existing_payee
+
+        # First, apply existing payee extraction patterns from the database
+        simplified_payee = self._apply_existing_payee_patterns(qif_payee)
+
+        # Then apply chain establishment logic
+        chain_simplified = self._simplify_chain_establishment(simplified_payee or qif_payee, existing_payee)
+
+        return chain_simplified or simplified_payee or qif_payee
+
+    def _apply_existing_payee_patterns(self, payee_text: str) -> Optional[str]:
+        """Apply existing payee extraction patterns from the database"""
+        try:
+            conn = sqlite3.connect(self.db.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT pattern, replacement, is_regex
+                FROM payee_extraction_patterns
+                WHERE is_active = 1
+                ORDER BY name
+            ''')
+
+            patterns = cursor.fetchall()
+            conn.close()
+
+            for pattern, replacement, is_regex in patterns:
+                if is_regex:
+                    import re
+                    try:
+                        if re.search(pattern, payee_text, re.IGNORECASE):
+                            result = re.sub(pattern, replacement, payee_text, flags=re.IGNORECASE)
+                            if result != payee_text:
+                                return result.strip()
+                    except re.error:
+                        continue
+                else:
+                    # Simple text matching
+                    if pattern.upper() in payee_text.upper():
+                        return replacement.strip()
+
+            return None
+
+        except Exception:
+            return None
+
+    def _simplify_chain_establishment(self, qif_payee: str, existing_payee: str) -> Optional[str]:
+        """Simplify chain establishment names per user preferences"""
+        if not qif_payee or not existing_payee:
+            return None
+
+        # Define known chain establishments where we prefer generic names
+        chain_patterns = {
+            'aldi': 'Aldi',
+            'walmart': 'Walmart',
+            'target': 'Target',
+            'costco': 'Costco',
+            'sam\'s club': 'Sam\'s Club',
+            'bj\'s': 'BJ\'s',
+            'food lion': 'Food Lion',
+            'kroger': 'Kroger',
+            'safeway': 'Safeway',
+            'cvs': 'CVS',
+            'walgreens': 'Walgreens',
+            'rite aid': 'Rite Aid',
+            'mcdonald\'s': 'McDonald\'s',
+            'burger king': 'Burger King',
+            'subway': 'Subway',
+            'kfc': 'KFC',
+            'taco bell': 'Taco Bell',
+            'wendy\'s': 'Wendy\'s',
+            'chick-fil-a': 'Chick-fil-A',
+            'dunkin': 'Dunkin',
+            'starbucks': 'Starbucks',
+            'home depot': 'Home Depot',
+            'lowe\'s': 'Lowe\'s',
+            'best buy': 'Best Buy',
+            'staples': 'Staples',
+            'office depot': 'Office Depot'
+        }
+
+        # Check if either payee contains a known chain
+        qif_lower = qif_payee.lower()
+        existing_lower = existing_payee.lower()
+
+        for chain_key, chain_name in chain_patterns.items():
+            if chain_key in qif_lower or chain_key in existing_lower:
+                # User preference: use generic chain name for establishments
+                # Check if existing payee is already the preferred generic name
+                if existing_payee.strip() == chain_name:
+                    # Existing is already perfect, don't suggest change
+                    return None
+                else:
+                    # QIF has location details, existing has something else
+                    # Suggest the clean chain name
+                    return chain_name
+
+        # If existing payee is already cleaner/shorter than QIF, prefer existing
+        if len(existing_payee.strip()) < len(qif_payee) * 0.6:
+            return None
+
+        return None
+
+    def _find_transfer_category(self) -> Optional[Dict]:
+        """Find or suggest a transfer/cash management category"""
+        try:
+            conn = sqlite3.connect(self.db.db_path)
+            cursor = conn.cursor()
+
+            # Look for existing transfer-related categories
+            cursor.execute('''
+                SELECT c.id, c.name, s.id, s.name
+                FROM categories c
+                LEFT JOIN subcategories s ON s.category_id = c.id
+                WHERE LOWER(c.name) LIKE '%transfer%'
+                   OR LOWER(c.name) LIKE '%cash%'
+                   OR LOWER(c.name) LIKE '%banking%'
+                   OR LOWER(s.name) LIKE '%transfer%'
+                   OR LOWER(s.name) LIKE '%cash%'
+                ORDER BY
+                    CASE
+                        WHEN LOWER(c.name) = 'cash management' THEN 1
+                        WHEN LOWER(c.name) LIKE '%transfer%' THEN 2
+                        WHEN LOWER(s.name) LIKE '%transfer%' THEN 3
+                        ELSE 4
+                    END
+                LIMIT 1
+            ''')
+
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                cat_id, cat_name, sub_id, sub_name = result
+                return {
+                    'app_category_id': cat_id,
+                    'app_subcategory_id': sub_id,
+                    'confidence': 0.95,
+                    'mapping_type': 'transfer_detected'
+                }
+
+            # If no transfer category exists, suggest creating one
+            return {
+                'app_category_id': None,
+                'app_subcategory_id': None,
+                'confidence': 0.8,
+                'mapping_type': 'suggest_transfer_category',
+                'suggested_category': 'Cash Management',
+                'suggested_subcategory': 'Transfer'
+            }
+
+        except Exception:
+            return None
+
     def _map_quicken_category(self, quicken_category: str) -> Optional[Dict]:
         """Map a Quicken category to our app's category system"""
         if not quicken_category:
             return None
-            
+
+        # Handle transfer categories (in brackets)
+        if quicken_category.startswith('[') and quicken_category.endswith(']'):
+            # This is a transfer between accounts - map to transfer/cash management category
+            return self._find_transfer_category()
+
         # Check existing mappings first
         existing_mapping = self.db.get_category_mapping(quicken_category)
         if existing_mapping:
             return existing_mapping
-            
+
         # Simple fuzzy matching against existing categories
         categories = self.db.get_all_categories()
         

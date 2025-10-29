@@ -168,10 +168,9 @@ class CSVFileHandler(FileSystemEventHandler):
                                     suggestion['subcategory'], category_id
                                 )
                             
-                            # Apply classification with note
-                            note = f"Auto-classified from pattern (confidence: {suggestion['confidence']:.2f})"
+                            # Apply classification without note
                             success = self.parser.db.update_transaction_category(
-                                transaction['id'], category_id, subcategory_id, note
+                                transaction['id'], category_id, subcategory_id, None
                             )
                             
                             if success:

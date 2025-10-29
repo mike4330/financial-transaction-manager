@@ -287,7 +287,7 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
     };
 
     fetchData();
-  }, [timeRange, config, homePreferences.selectedAccounts]); // Re-fetch when time range, config, or account filters change
+  }, [timeRange, config, homePreferences.selectedAccounts, startFromZero]); // Re-fetch when time range, config, account filters, or Y-axis setting changes
 
   const formatCurrency = (value: number) => `$${value.toFixed(0)}`;
   const formatTooltip = (value: number, name: string) => {

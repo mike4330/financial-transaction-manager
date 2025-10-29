@@ -112,6 +112,7 @@ const Budget: React.FC = () => {
     transaction_count: number;
   }[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [autoAmounts, setAutoAmounts] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     const fetchAvailableMonths = async () => {
@@ -276,29 +277,75 @@ const Budget: React.FC = () => {
   // Function to fetch all available categories
   const fetchAvailableCategories = async () => {
     if (!budgetInfo) return;
-    
+
     try {
       setLoadingCategories(true);
-      
+
       // Fetch all categories/subcategories that exist in transactions
-      const response = await fetch('/api/categories-with-spending');
-      if (!response.ok) {
+      const categoriesResponse = await fetch('/api/categories-with-spending');
+      if (!categoriesResponse.ok) {
         throw new Error('Failed to fetch available categories');
       }
-      
-      const data = await response.json();
-      
+
+      const categoriesData = await categoriesResponse.json();
+
       // Filter out categories/subcategories already in the current budget
       const currentBudgetItems = new Set(
         budgetItems.map(item => `${item.category}|${item.subcategory || ''}`)
       );
-      
-      const available = data.categories.filter((cat: any) => {
+
+      const available = categoriesData.categories.filter((cat: any) => {
         const key = `${cat.category}|${cat.subcategory || ''}`;
         return !currentBudgetItems.has(key);
       });
-      
+
       setAvailableCategories(available);
+
+      // Fetch auto-amounts for available categories (try new endpoint, fallback to pattern projections)
+      const autoAmountMap = new Map<string, number>();
+
+      // Try to fetch pattern projections as fallback
+      try {
+        const projectionsResponse = await fetch(`/api/monthly-pattern-projections?year=${budgetInfo.year}&month=${budgetInfo.month}`);
+        if (projectionsResponse.ok) {
+          const projectionsData = await projectionsResponse.json();
+          const projections = projectionsData.category_projections || [];
+
+          // Add pattern projection amounts to the map
+          projections.forEach((proj: any) => {
+            const key = `${proj.category}|${proj.subcategory || ''}`;
+            const amount = proj.expense_projected > 0 ? proj.expense_projected : proj.income_projected;
+            if (amount > 0) {
+              autoAmountMap.set(key, amount);
+            }
+          });
+        }
+      } catch (err) {
+        console.log('Pattern projections not available:', err);
+      }
+
+      // Try to fetch auto-calculate amounts (preferred, but may not work if endpoint not available)
+      const fetchPromises = available.slice(0, 5).map(async (cat: any) => { // Limit to first 5 to avoid overwhelming
+        try {
+          const encodedCategory = encodeURIComponent(cat.category);
+          const subcategoryParam = cat.subcategory ? `&subcategory=${encodeURIComponent(cat.subcategory)}` : '';
+          const autoCalcUrl = `/api/categories/${encodedCategory}/auto-calculate?year=${budgetInfo.year}&month=${budgetInfo.month}${subcategoryParam}`;
+
+          const autoResponse = await fetch(autoCalcUrl);
+          if (autoResponse.ok) {
+            const autoData = await autoResponse.json();
+            const key = `${cat.category}|${cat.subcategory || ''}`;
+            autoAmountMap.set(key, autoData.suggested_amount); // This will override pattern projection if available
+          }
+        } catch (err) {
+          // Silently ignore auto-calc errors for individual categories
+        }
+      });
+
+      // Wait for auto-amount fetches (but don't block if they all fail)
+      await Promise.allSettled(fetchPromises);
+      setAutoAmounts(autoAmountMap);
+
     } catch (err) {
       console.error('Error fetching available categories:', err);
       showDialog(
@@ -308,6 +355,48 @@ const Budget: React.FC = () => {
       );
     } finally {
       setLoadingCategories(false);
+    }
+  };
+
+  // Function to add category with auto-calculated amount
+  const addWithAutoAmount = async (category: string, subcategory: string | null, budgetType: 'income' | 'expense') => {
+    if (!budgetInfo) return;
+
+    const itemName = subcategory ? `${category} - ${subcategory}` : category;
+    const key = `${category}|${subcategory || ''}`;
+    const autoAmount = autoAmounts.get(key);
+
+    if (!autoAmount) {
+      showDialog(
+        'Auto-calculation Not Available',
+        'No auto-calculated amount available for this category',
+        'warning'
+      );
+      return;
+    }
+
+    try {
+      setAddingCategory(itemName);
+
+      // Add the category with the pre-calculated auto amount
+      await addSpecificCategoryToBudget(category, subcategory, budgetType, autoAmount);
+
+      // Show success message
+      showDialog(
+        'Category Added with Auto Amount',
+        `Added "${itemName}" with auto-calculated amount of $${autoAmount.toLocaleString()}`,
+        'success'
+      );
+
+    } catch (err) {
+      console.error('Error adding category with auto amount:', err);
+      showDialog(
+        'Error Adding Category',
+        `Failed to add category: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        'error'
+      );
+    } finally {
+      setAddingCategory(null);
     }
   };
 
@@ -1266,7 +1355,7 @@ const Budget: React.FC = () => {
                                   </span>
                                 </div>
                                 <div className={styles.addControls}>
-                                  <select 
+                                  <select
                                     className={styles.budgetTypeSelect}
                                     defaultValue="expense"
                                     id={`type-${categoryName}-${item.subcategory || 'null'}`}
@@ -1274,28 +1363,43 @@ const Budget: React.FC = () => {
                                     <option value="expense">Expense</option>
                                     <option value="income">Income</option>
                                   </select>
-                                  <input
-                                    type="number"
-                                    className={styles.budgetAmountInput}
-                                    placeholder="$0"
-                                    min="0"
-                                    step="0.01"
-                                    id={`amount-${categoryName}-${item.subcategory || 'null'}`}
-                                  />
-                                  <button
-                                    onClick={() => {
-                                      const typeSelect = document.getElementById(`type-${categoryName}-${item.subcategory || 'null'}`) as HTMLSelectElement;
-                                      const amountInput = document.getElementById(`amount-${categoryName}-${item.subcategory || 'null'}`) as HTMLInputElement;
-                                      const budgetType = typeSelect.value as 'income' | 'expense';
-                                      const amount = parseFloat(amountInput.value) || 0;
-                                      
-                                      addSpecificCategoryToBudget(categoryName, item.subcategory, budgetType, amount);
-                                    }}
-                                    className={styles.addCategoryButton}
-                                    title={`Add ${categoryName}${item.subcategory ? ` - ${item.subcategory}` : ''} to budget`}
-                                  >
-                                    Add
-                                  </button>
+                                  {(() => {
+                                    const key = `${categoryName}|${item.subcategory || ''}`;
+                                    const autoAmount = autoAmounts.get(key);
+                                    const itemName = item.subcategory ? `${categoryName} - ${item.subcategory}` : categoryName;
+                                    const isAdding = addingCategory === itemName;
+
+                                    return (
+                                      <>
+                                        {autoAmount && (
+                                          <button
+                                            onClick={() => {
+                                              const typeSelect = document.getElementById(`type-${categoryName}-${item.subcategory || 'null'}`) as HTMLSelectElement;
+                                              const budgetType = typeSelect.value as 'income' | 'expense';
+                                              addWithAutoAmount(categoryName, item.subcategory, budgetType);
+                                            }}
+                                            className={styles.addAutoButton}
+                                            disabled={isAdding}
+                                            title={`Add with auto-calculated amount of $${autoAmount.toLocaleString()} based on historical data`}
+                                          >
+                                            {isAdding ? 'Adding...' : `Add Auto ($${autoAmount.toLocaleString()})`}
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => {
+                                            const typeSelect = document.getElementById(`type-${categoryName}-${item.subcategory || 'null'}`) as HTMLSelectElement;
+                                            const budgetType = typeSelect.value as 'income' | 'expense';
+                                            addSpecificCategoryToBudget(categoryName, item.subcategory, budgetType, 0);
+                                          }}
+                                          className={styles.addEmptyButton}
+                                          disabled={isAdding}
+                                          title={`Add ${itemName} with $0 budget`}
+                                        >
+                                          {isAdding ? 'Adding...' : 'Add Empty'}
+                                        </button>
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             ))}

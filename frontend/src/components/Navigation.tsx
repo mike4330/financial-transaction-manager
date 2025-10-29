@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, CreditCard, Users, TreePine, DollarSign, RotateCcw, Settings } from 'lucide-react';
+import { BarChart3, CreditCard, Users, TreePine, DollarSign, RotateCcw, Settings, TrendingUp } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import { FileUpload } from './FileUpload';
 
 interface NavigationProps {
-  currentPage?: 'home' | 'transactions' | 'treemap' | 'budget' | 'patterns' | 'payees';
+  currentPage?: 'home' | 'transactions' | 'treemap' | 'budget' | 'patterns' | 'payees' | 'visualization';
   stats?: any;
   onShowPreferences?: () => void;
 }
@@ -19,6 +20,7 @@ const Navigation: React.FC<NavigationProps> = ({ stats, onShowPreferences }) => 
     { path: '/budget', label: 'Budget', icon: DollarSign },
     { path: '/patterns', label: 'Patterns', icon: RotateCcw },
     { path: '/payees', label: 'Payees', icon: Users },
+    { path: '/visualization', label: 'Visualize', icon: TrendingUp },
   ];
 
   return (
@@ -54,21 +56,20 @@ const Navigation: React.FC<NavigationProps> = ({ stats, onShowPreferences }) => 
           
           <div className="flex items-center gap-4">
             {/* Stats Display */}
-            {stats && (
+            {stats && stats.uncategorized_count > 0 && (
               <div className="text-sm text-gray-600 dark:text-warm-400 transition-colors duration-300">
-                <span className="mr-2">📈</span>
-                {stats.total_transactions?.toLocaleString() || 0} transactions
-                {stats.uncategorized_count > 0 && (
-                  <span className="ml-2 px-2 py-1 bg-amber-100 text-amber-800 dark:bg-ember-900/30 dark:text-ember-300 rounded-full text-xs font-medium">
-                    {stats.uncategorized_count} uncategorized
-                  </span>
-                )}
+                <span className="px-2 py-1 bg-amber-100 text-amber-800 dark:bg-ember-900/30 dark:text-ember-300 rounded-full text-xs font-medium">
+                  {stats.uncategorized_count} uncategorized
+                </span>
               </div>
             )}
-            
+
+            {/* File Upload */}
+            <FileUpload />
+
             {/* Theme Toggle */}
             <ThemeToggle />
-            
+
             {/* Preferences Button */}
             {onShowPreferences && (
               <button

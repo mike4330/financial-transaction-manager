@@ -434,7 +434,7 @@ class AITransactionClassifier:
             
             if auto_apply and confidence > 0.7:  # Only auto-apply high confidence classifications
                 success = self.db.update_transaction_category(
-                    tx_id, category, subcategory, f"Auto-classified (confidence: {confidence:.2f})"
+                    tx_id, category, subcategory, None
                 )
                 result['applied'] = success
                 if success:
@@ -476,8 +476,7 @@ class AITransactionClassifier:
                 # If AI agrees or we have high confidence in the pattern, apply it
                 if (suggested_cat == category or confidence < 0.5) and confidence >= confidence_threshold:
                     success = self.db.update_transaction_category(
-                        tx_id, category, subcategory, 
-                        f"Pattern-classified: {pattern} (confidence: {confidence:.2f})"
+                        tx_id, category, subcategory, None
                     )
                     if success:
                         classified_count += 1
@@ -626,8 +625,7 @@ class AITransactionClassifier:
                 # Update category if improved  
                 if needs_category_fix:
                     success &= self.db.update_transaction_category(
-                        tx_id, new_category, new_subcategory, 
-                        f"Fixed via pattern analysis (confidence: {confidence:.2f})"
+                        tx_id, new_category, new_subcategory, None
                     )
                     
                     # Learn patterns from successful fixes

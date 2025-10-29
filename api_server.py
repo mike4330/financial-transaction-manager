@@ -1094,30 +1094,38 @@ def get_unbudgeted_categories(year: int, month: int):
             key = f"{row['category']}|{row['subcategory'] or ''}"
             budgeted_combinations.add(key)
 
-        # Find unbudgeted spending combinations
+        # Simple grouping: treat each category/subcategory combination as literal
         unbudgeted_items = []
-        total_unbudgeted = 0
         total_spending = 0
+        total_unbudgeted = 0
 
+        # Calculate total spending
         for row in spending_query:
             total_spending += row['total_spent']
 
-            # Create key for this spending combination
-            spending_key = f"{row['category']}|{row['subcategory'] or ''}"
+        # Check each spending combination against budget combinations
+        for row in spending_query:
+            category = row['category']
+            subcategory = row['subcategory']
+
+            # Create key for exact matching - treat subcategory as literal string
+            spending_key = f"{category}|{subcategory or ''}"
 
             # Check if this exact combination is budgeted
-            if spending_key not in budgeted_combinations:
+            is_budgeted = spending_key in budgeted_combinations
+
+            if not is_budgeted:
                 percentage = (row['total_spent'] / total_spending * 100) if total_spending > 0 else 0
 
                 # Format display name
-                if row['subcategory']:
-                    display_name = f"{row['category']} - {row['subcategory']}"
+                if subcategory:
+                    display_name = f"{category} - {subcategory}"
                 else:
-                    display_name = row['category']
+                    display_name = category
 
                 unbudgeted_item = {
-                    "category": row['category'],
-                    "subcategory": row['subcategory'],
+                    "category": category,
+                    "subcategory": subcategory,
                     "display_name": display_name,
                     "amount": float(row['total_spent']),
                     "percentage": percentage,
@@ -2374,6 +2382,112 @@ def apply_payee_pattern(pattern_id: int):
         
     except Exception as e:
         logger.error(f"Error applying payee pattern: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/categories/<category>/auto-calculate', methods=['GET'])
+def auto_calculate_category_amount(category: str):
+    """Calculate historical average for a category/subcategory combination (same logic as budget item auto-calculate)"""
+    try:
+        from urllib.parse import unquote
+        from datetime import datetime
+
+        # URL decode the category name
+        category = unquote(category)
+        subcategory = request.args.get('subcategory')
+        if subcategory:
+            subcategory = unquote(subcategory)
+
+        # Get target year/month from query params or use current
+        target_year = int(request.args.get('year', datetime.now().year))
+        target_month = int(request.args.get('month', datetime.now().month))
+
+        db = get_transaction_db()
+        conn = get_db_connection()
+
+        # Get category and subcategory IDs (same logic as existing endpoint)
+        category_query = conn.execute('SELECT id FROM categories WHERE name = ?', (category,)).fetchone()
+        if not category_query:
+            return jsonify({"error": f"Category '{category}' not found"}), 404
+        category_id = category_query['id']
+
+        subcategory_id = None
+        if subcategory:
+            subcategory_query = conn.execute('SELECT id FROM subcategories WHERE name = ?', (subcategory,)).fetchone()
+            if subcategory_query:
+                subcategory_id = subcategory_query['id']
+
+        conn.close()
+
+        # Calculate historical average (exact same logic as existing endpoint)
+        result = db.calculate_historical_average(
+            category_id=category_id,
+            subcategory_id=subcategory_id,
+            target_year=target_year,
+            target_month=target_month
+        )
+
+        if result is None:
+            return jsonify({
+                "error": "Insufficient historical data",
+                "message": "Need at least 3 months of transaction data for auto-calculation"
+            }), 400
+
+        # Return exact same format as existing endpoint
+        return jsonify({
+            "suggested_amount": result['amount'],
+            "confidence": result['confidence'],
+            "analysis": {
+                "months_used": result['months_used'],
+                "outliers_removed": result['outliers_removed'],
+                "median": result['median'],
+                "confidence_description": _get_confidence_description(result['confidence'])
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error auto-calculating category amount: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/categories-with-spending', methods=['GET'])
+def get_categories_with_spending():
+    """Get all categories and subcategories that have transaction activity"""
+    try:
+        conn = get_db_connection()
+
+        # Get all category/subcategory combinations that have transactions
+        query = conn.execute('''
+            SELECT c.name as category,
+                   s.name as subcategory,
+                   COUNT(t.id) as transaction_count,
+                   SUM(ABS(t.amount)) as total_amount
+            FROM transactions t
+            JOIN categories c ON t.category_id = c.id
+            LEFT JOIN subcategories s ON t.subcategory_id = s.id
+            WHERE c.name NOT IN ('Banking', 'Investment', 'Transfer')  -- Exclude system categories
+            GROUP BY c.id, c.name, s.id, s.name
+            HAVING transaction_count > 0
+            ORDER BY c.name, s.name
+        ''').fetchall()
+
+        categories = []
+        for row in query:
+            categories.append({
+                "category": row['category'],
+                "subcategory": row['subcategory'],
+                "transaction_count": row['transaction_count'],
+                "total_amount": float(row['total_amount'])
+            })
+
+        conn.close()
+
+        return jsonify({
+            "categories": categories,
+            "count": len(categories)
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching categories with spending: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/upload-csv', methods=['POST'])

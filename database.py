@@ -631,7 +631,7 @@ class TransactionDB:
             txn_date, txn_amount = txn_info if txn_info else ('1970-01-01', 0.0)
             
             cursor.execute('''
-                INSERT INTO qif_reconciliation_log 
+                INSERT OR REPLACE INTO qif_reconciliation_log 
                 (qif_file_path, batch_number, qif_transaction_hash, qif_date, 
                  qif_amount, reconciliation_status, matched_transaction_id, 
                  import_decision, notes, reconciled_at, reconciled_by)
@@ -1943,14 +1943,15 @@ class TransactionDB:
             
             monthly_budget_id = monthly_budget[0]
             
-            # Update actual amounts for expense items
+            # Update actual amounts for expense items - exact category/subcategory matching
             cursor.execute('''
-                UPDATE monthly_budget_items 
+                UPDATE monthly_budget_items
                 SET actual_amount = (
                     SELECT COALESCE(SUM(ABS(t.amount)), 0)
                     FROM transactions t
                     WHERE t.category_id = monthly_budget_items.category_id
-                    AND (monthly_budget_items.subcategory_id IS NULL OR t.subcategory_id = monthly_budget_items.subcategory_id)
+                    AND ((monthly_budget_items.subcategory_id IS NULL AND t.subcategory_id IS NULL)
+                         OR t.subcategory_id = monthly_budget_items.subcategory_id)
                     AND strftime('%Y', t.run_date) = ?
                     AND strftime('%m', t.run_date) = ?
                     AND t.amount < 0
@@ -1959,14 +1960,15 @@ class TransactionDB:
                 WHERE monthly_budget_id = ? AND budget_type = 'expense'
             ''', (str(year), f"{month:02d}", monthly_budget_id))
             
-            # Update actual amounts for income items
+            # Update actual amounts for income items - exact category/subcategory matching
             cursor.execute('''
-                UPDATE monthly_budget_items 
+                UPDATE monthly_budget_items
                 SET actual_amount = (
                     SELECT COALESCE(SUM(ABS(t.amount)), 0)
                     FROM transactions t
                     WHERE t.category_id = monthly_budget_items.category_id
-                    AND (monthly_budget_items.subcategory_id IS NULL OR t.subcategory_id = monthly_budget_items.subcategory_id)
+                    AND ((monthly_budget_items.subcategory_id IS NULL AND t.subcategory_id IS NULL)
+                         OR t.subcategory_id = monthly_budget_items.subcategory_id)
                     AND strftime('%Y', t.run_date) = ?
                     AND strftime('%m', t.run_date) = ?
                     AND t.amount > 0
