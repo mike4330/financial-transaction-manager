@@ -116,7 +116,10 @@ def main():
     parser.add_argument('--lookback-days',
                        type=int, default=365, metavar='DAYS',
                        help='Days to look back for pattern detection (default: 365)')
-    
+    parser.add_argument('--enable-llm-payee',
+                       action='store_true',
+                       help='Enable LLM-based payee extraction fallback (requires ANTHROPIC_API_KEY)')
+
     args = parser.parse_args()
     
     # Setup logging
@@ -243,8 +246,8 @@ def main():
             
             # Create HTML callback function - always regenerate HTML in monitor mode when data changes
             html_callback = lambda: generate_html_report(db, args.html_file)
-            
-            monitor = FileMonitor(args.transactions_dir, db, auto_process=True, html_callback=html_callback)
+
+            monitor = FileMonitor(args.transactions_dir, db, auto_process=True, html_callback=html_callback, enable_llm_payee=args.enable_llm_payee)
             
             # Process existing files first
             stats = monitor.process_existing_files()

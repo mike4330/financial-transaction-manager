@@ -71,8 +71,8 @@ For the modern React web interface:
 2. **Start React frontend** (in a new terminal):
    ```bash
    cd frontend
-   npm install  # First time only
-   npm run dev
+   pnpm install  # First time only
+   pnpm run dev
    ```
 
 3. **Access the web interface**:
@@ -155,7 +155,7 @@ python3 main.py --stats
 
 # Create and manage budgets through web interface
 python3 api_server.py  # Start backend
-cd frontend && npm run dev  # Start frontend
+cd frontend && pnpm run dev  # Start frontend
 ```
 
 ### Pattern Learning Workflow

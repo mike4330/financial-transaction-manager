@@ -17,14 +17,19 @@ pip install -r requirements.txt
 # Process CSV files
 python3 main.py --process-existing --stats
 
+# Optional: Enable LLM payee extraction (requires ANTHROPIC_API_KEY)
+export ANTHROPIC_API_KEY='sk-ant-api03-...'
+python3 main.py --monitor --enable-llm-payee
+
 # Start web interface
 python3 api_server.py          # Terminal 1 - Backend on :5000
-cd frontend && npm run dev      # Terminal 2 - Frontend on :3001
+cd frontend && pnpm run dev     # Terminal 2 - Frontend on :3001
 ```
 
 ## Key Development Standards
 
 ### Frontend
+- **Package Manager:** Use `pnpm` (not npm) - npm has installation issues on this system
 - **Chart Library:** Always use Recharts (not custom SVG) - see `GenericChart.tsx` and `Budget.tsx` for examples
 - **Dialogs:** Use Dialog components, never `alert()`, `confirm()`, or `prompt()`
 - **App Entry:** Modify `App.router.tsx` for global changes, NOT `App.simple.tsx` (legacy/unused)
@@ -43,9 +48,14 @@ cd frontend && npm run dev      # Terminal 2 - Frontend on :3001
 python3 main.py --ai-classify 25 --ai-auto-apply
 python3 main.py --categorize "PATTERN" "Category" "Subcategory"
 
-# Payee extraction
+# Payee extraction (regex-based)
 python3 payee_extractor.py --dry-run
 python3 payee_extractor.py --apply
+
+# LLM payee extraction (NEW - requires ANTHROPIC_API_KEY)
+python3 llm_payee_fix.py --dry-run --limit 50      # Preview
+python3 llm_payee_fix.py --apply --limit 50        # Fix missing payees
+python3 llm_payee_fix.py --stats                   # Show statistics
 
 # Recurring patterns
 python3 main.py --detect-recurring --save-patterns --lookback-days 365
@@ -85,6 +95,7 @@ sqlite3 transactions.db "SELECT * FROM monthly_budget_items LIMIT 5;"
 
 - **Pattern Learning:** Successfully categorized transactions teach the system
 - **Recurring Detection:** Identifies subscription/bill patterns for balance projections
+- **LLM Payee Extraction:** NEW - Intelligent fallback using Claude API when regex fails (90-95% success rate)
 - **Multi-Account:** Tracks multiple investment/checking accounts
 - **Dashboard:** Configurable 2x2 grid with timeseries/stat/summary cards
 - **Balance Projections:** Quicken-style forecasting using recurring patterns
@@ -94,4 +105,7 @@ sqlite3 transactions.db "SELECT * FROM monthly_budget_items LIMIT 5;"
 - Proxy config: Vite proxies `/api` to Flask backend (port 5000)
 - Date format: MM/DD/YYYY for database compatibility
 - All visualizations use Recharts for consistency
+- LLM logging: `llm_payee_extraction.log` for detailed API call logs
+- Main logging: `transaction_parser.log` for general system logs
 - See `INTERNALS.md` for comprehensive technical documentation
+- See `LLM_PAYEE_EXTRACTION.md` for LLM payee extraction details

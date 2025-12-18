@@ -9,11 +9,12 @@ from csv_parser import CSVParser
 from database import TransactionDB
 
 class CSVFileHandler(FileSystemEventHandler):
-    def __init__(self, parser: CSVParser, auto_process: bool = True, html_callback=None, enable_post_processing: bool = True):
+    def __init__(self, parser: CSVParser, auto_process: bool = True, html_callback=None, enable_post_processing: bool = True, enable_llm_payee: bool = False):
         self.parser = parser
         self.auto_process = auto_process
         self.html_callback = html_callback
         self.enable_post_processing = enable_post_processing
+        self.enable_llm_payee = enable_llm_payee
         self.logger = logging.getLogger(__name__)
         
     def on_created(self, event):
@@ -66,24 +67,34 @@ class CSVFileHandler(FileSystemEventHandler):
     def _run_post_processing(self):
         """Run payee extraction and AI classification on newly imported transactions"""
         try:
-            # Step 1: Run payee extraction
-            self.logger.info("Running payee extraction on new transactions...")
+            # Step 1: Run regex-based payee extraction
+            self.logger.info("Running regex-based payee extraction on new transactions...")
             payee_result = self._run_payee_extraction()
-            
+
             if payee_result:
-                self.logger.info(f"Payee extraction completed: {payee_result}")
+                self.logger.info(f"Regex payee extraction completed: {payee_result}")
             else:
-                self.logger.warning("Payee extraction failed or returned no results")
-            
-            # Step 2: Run AI classification
+                self.logger.warning("Regex payee extraction failed or returned no results")
+
+            # Step 2: Run LLM-based payee extraction for failures (NEW!)
+            if self.enable_llm_payee:
+                self.logger.info("Running LLM fallback for missing payees...")
+                llm_result = self._run_llm_payee_extraction()
+
+                if llm_result:
+                    self.logger.info(f"LLM payee extraction completed: {llm_result}")
+                else:
+                    self.logger.warning("LLM payee extraction failed or returned no results")
+
+            # Step 3: Run pattern-based AI classification
             self.logger.info("Running AI classification on uncategorized transactions...")
             ai_result = self._run_ai_classification()
-            
+
             if ai_result:
                 self.logger.info(f"AI classification completed: {ai_result}")
             else:
                 self.logger.warning("AI classification failed or returned no results")
-                
+
         except Exception as e:
             self.logger.error(f"Error during post-processing: {e}")
     
@@ -116,7 +127,7 @@ class CSVFileHandler(FileSystemEventHandler):
                 timeout=120,  # 2 minute timeout
                 cwd=os.path.dirname(os.path.abspath(__file__))
             )
-            
+
             if result.returncode == 0:
                 # Parse output for success info
                 output_lines = result.stdout.strip().split('\n')
@@ -124,12 +135,126 @@ class CSVFileHandler(FileSystemEventHandler):
             else:
                 self.logger.error(f"Payee extraction subprocess failed: {result.stderr}")
                 return None
-                
+
         except subprocess.TimeoutExpired:
             self.logger.error("Payee extraction subprocess timed out")
             return None
         except Exception as e:
             self.logger.error(f"Error running payee extraction subprocess: {e}")
+            return None
+
+    def _run_llm_payee_extraction(self):
+        """
+        Run LLM-based payee extraction for transactions where regex failed
+
+        This is the NEW fallback layer that uses Claude API to extract payees
+        when regex patterns don't match.
+        """
+        try:
+            self.logger.info("=" * 80)
+            self.logger.info("STARTING LLM PAYEE EXTRACTION FALLBACK")
+            self.logger.info("=" * 80)
+
+            # Import LLM payee extractor
+            from llm_payee_extractor import LLMPayeeExtractor
+
+            # Get transactions with missing payees
+            import sqlite3
+            conn = sqlite3.connect(self.parser.db.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            # Find transactions with NULL or "No Description" payees
+            self.logger.debug("Querying for transactions with missing payees...")
+            cursor.execute('''
+                SELECT id, action, description, amount
+                FROM transactions
+                WHERE (payee IS NULL OR payee = '' OR payee = 'No Description')
+                AND type NOT IN ('Investment Trade', 'Dividend', 'Reinvestment', 'Dividend Taxes', 'Brokerage Fee')
+                AND symbol IS NULL
+                ORDER BY id DESC
+                LIMIT 100
+            ''')
+
+            failed_transactions = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+
+            if not failed_transactions:
+                self.logger.info("No transactions with missing payees found")
+                self.logger.info("=" * 80)
+                return "no transactions with missing payees"
+
+            self.logger.info(f"Found {len(failed_transactions)} transactions with missing payees")
+            self.logger.debug(f"Transaction IDs: {[tx['id'] for tx in failed_transactions[:20]]}"
+                            f"{'...' if len(failed_transactions) > 20 else ''}")
+
+            # Initialize LLM extractor
+            self.logger.info("Initializing LLM payee extractor...")
+            extractor = LLMPayeeExtractor(self.parser.db, enable_caching=True, max_batch_size=20)
+            self.logger.info(f"LLM extractor initialized (caching: enabled, max_batch: 20)")
+
+            # Extract payees in batches
+            self.logger.info(f"Starting batch extraction for {len(failed_transactions)} transactions...")
+            results = extractor.extract_batch(failed_transactions)
+            self.logger.info(f"Batch extraction complete, processing {len(results)} results...")
+
+            # Update database with successful extractions
+            updated_count = 0
+            low_confidence_count = 0
+            failed_count = 0
+
+            for result in results:
+                if result.get('payee') and result.get('confidence', 0.0) >= 0.7:
+                    try:
+                        conn = sqlite3.connect(self.parser.db.db_path)
+                        cursor = conn.cursor()
+                        cursor.execute('''
+                            UPDATE transactions
+                            SET payee = ?, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = ?
+                        ''', (result['payee'], result['id']))
+                        conn.commit()
+                        conn.close()
+                        updated_count += 1
+                        self.logger.debug(f"✓ TX#{result['id']}: '{result['payee']}' (confidence: {result['confidence']:.2f})")
+                    except Exception as e:
+                        self.logger.warning(f"✗ Failed to update TX#{result['id']}: {e}")
+                        failed_count += 1
+                elif result.get('payee'):
+                    low_confidence_count += 1
+                    self.logger.debug(f"? TX#{result['id']}: '{result['payee']}' skipped (confidence: {result['confidence']:.2f} < 0.7)")
+                else:
+                    failed_count += 1
+                    self.logger.debug(f"✗ TX#{result['id']}: No payee extracted - {result.get('explanation', 'unknown')}")
+
+            # Get caching stats
+            stats = extractor.get_stats()
+
+            # Summary logging
+            self.logger.info("=" * 80)
+            self.logger.info("LLM PAYEE EXTRACTION SUMMARY:")
+            self.logger.info(f"  Total processed: {len(failed_transactions)}")
+            self.logger.info(f"  Successfully updated: {updated_count}")
+            self.logger.info(f"  Low confidence (skipped): {low_confidence_count}")
+            self.logger.info(f"  Failed: {failed_count}")
+            self.logger.info(f"  Patterns cached: {stats.get('cached_patterns', 0)} total")
+            self.logger.info("=" * 80)
+
+            return f"extracted {updated_count}/{len(failed_transactions)} payees via LLM (cached {stats.get('cached_patterns', 0)} patterns)"
+
+        except ImportError as e:
+            self.logger.warning(f"LLM payee extraction not available: {e}")
+            self.logger.info("=" * 80)
+            return None
+        except ValueError as e:
+            # API key not configured
+            self.logger.warning(f"LLM payee extraction disabled: {e}")
+            self.logger.warning("Set ANTHROPIC_API_KEY environment variable to enable LLM payee extraction")
+            self.logger.info("=" * 80)
+            return None
+        except Exception as e:
+            self.logger.error(f"Error running LLM payee extraction: {e}", exc_info=True)
+            self.logger.info("=" * 80)
             return None
     
     def _run_ai_classification(self):
@@ -155,29 +280,34 @@ class CSVFileHandler(FileSystemEventHandler):
                 
                 for transaction in batch:
                     try:
-                        # Get classification suggestion
-                        suggestion = classifier.classify_transaction(transaction)
-                        
-                        if suggestion and suggestion.get('confidence', 0) >= 0.7:  # High confidence threshold
+                        # Get classification suggestion (returns tuple: category, subcategory, confidence)
+                        # Transaction format from get_uncategorized_transactions:
+                        # (id, run_date, account, description, amount, action, payee)
+                        tx_id = transaction[0]
+                        description = transaction[3]
+                        amount = transaction[4]
+                        action = transaction[5]
+                        payee = transaction[6]
+                        transaction_type = None  # Not included in uncategorized query
+
+                        category, subcategory, confidence = classifier.classify_transaction_text(
+                            description, action, amount, payee, transaction_type
+                        )
+
+                        if confidence >= 0.7:  # High confidence threshold
                             # Auto-apply high confidence classifications
-                            category_id = self.parser.db.get_or_create_category(suggestion['category'])
-                            subcategory_id = None
-                            
-                            if suggestion.get('subcategory'):
-                                subcategory_id = self.parser.db.get_or_create_subcategory(
-                                    suggestion['subcategory'], category_id
-                                )
-                            
-                            # Apply classification without note
+                            # update_transaction_category expects category/subcategory as string names
+                            # and will handle ID creation internally
                             success = self.parser.db.update_transaction_category(
-                                transaction['id'], category_id, subcategory_id, None
+                                tx_id, category, subcategory, None
                             )
-                            
+
                             if success:
                                 processed_count += 1
                                 
                     except Exception as e:
-                        self.logger.warning(f"Error classifying transaction {transaction.get('id', 'unknown')}: {e}")
+                        tx_id_for_log = transaction[0] if transaction and len(transaction) > 0 else 'unknown'
+                        self.logger.warning(f"Error classifying transaction {tx_id_for_log}: {e}")
                         continue
             
             return f"classified {processed_count} transactions"
@@ -217,12 +347,13 @@ class CSVFileHandler(FileSystemEventHandler):
             return None
 
 class FileMonitor:
-    def __init__(self, watch_directory: str, db: TransactionDB, auto_process: bool = True, html_callback=None, enable_post_processing: bool = True):
+    def __init__(self, watch_directory: str, db: TransactionDB, auto_process: bool = True, html_callback=None, enable_post_processing: bool = True, enable_llm_payee: bool = False):
         self.watch_directory = watch_directory
         self.db = db
         self.auto_process = auto_process
         self.html_callback = html_callback
         self.enable_post_processing = enable_post_processing
+        self.enable_llm_payee = enable_llm_payee
         self.observer = None
         self.parser = CSVParser(db)
         self.logger = logging.getLogger(__name__)
@@ -231,8 +362,8 @@ class FileMonitor:
         """Start monitoring the directory for new CSV files"""
         if not os.path.exists(self.watch_directory):
             raise FileNotFoundError(f"Watch directory does not exist: {self.watch_directory}")
-        
-        event_handler = CSVFileHandler(self.parser, self.auto_process, self.html_callback, self.enable_post_processing)
+
+        event_handler = CSVFileHandler(self.parser, self.auto_process, self.html_callback, self.enable_post_processing, self.enable_llm_payee)
         self.observer = Observer()
         self.observer.schedule(event_handler, self.watch_directory, recursive=False)
         
