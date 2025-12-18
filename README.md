@@ -303,6 +303,29 @@ All endpoints support CORS and return JSON responses with proper error handling.
 
 ### Performance Optimization
 - **Production-Ready**: Optimized database initialization for instant Flask startup
-- **Singleton Pattern**: Shared database instance prevents re-initialization overhead  
+- **Singleton Pattern**: Shared database instance prevents re-initialization overhead
 - **Fast API Response**: Sub-millisecond response times for common operations
 - **Minimal Bootstrap**: Removed expensive migration checks for established databases
+
+## Deployment
+
+### Production Deployment (Hetzner VPS)
+
+For deploying to a production environment on Hetzner or similar VPS providers, see the comprehensive **[Hetzner Migration Guide](HETZNER_MIGRATION.md)** which covers:
+
+- Complete server setup and configuration
+- Systemd service creation for auto-start
+- Firewall configuration
+- Git-based deployment workflow
+- Troubleshooting common issues (including IPv6/localhost proxy issues)
+- Database backup strategies
+- Security hardening recommendations
+
+**Quick summary:**
+- Backend runs as systemd service on port 5000
+- Frontend runs as systemd service on port 3001
+- Uses pnpm for frontend package management
+- Direct port access (no reverse proxy required for internal use)
+- Vite dev server configured for production-like environment
+
+For local development, see **[START_WEB_APP.md](START_WEB_APP.md)** for quick start instructions.

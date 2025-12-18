@@ -102,9 +102,15 @@ cd ~/bank/frontend
 # Install dependencies
 pnpm install
 
+# Fix Vite proxy to use IPv4 (required for Hetzner)
+# Update vite.config.ts to use 127.0.0.1 instead of localhost
+sed -i "s|target: 'http://localhost:5000'|target: 'http://127.0.0.1:5000'|g" vite.config.ts
+
 # Build production assets (optional, can run dev mode)
 pnpm run build
 ```
+
+**Important:** The Vite proxy must use `127.0.0.1` instead of `localhost` to avoid IPv6 connection issues on Hetzner.
 
 ### 5. Create Systemd Services
 
@@ -159,7 +165,7 @@ WorkingDirectory=/home/bankapp/bank/frontend
 Environment=PATH=/usr/bin:/usr/local/bin
 Environment=NODE_ENV=production
 
-ExecStart=/usr/bin/pnpm run dev -- --host 0.0.0.0 --port 3001
+ExecStart=/usr/local/bin/pnpm run dev -- --host 0.0.0.0 --port 3001
 
 Restart=always
 RestartSec=5
@@ -451,6 +457,22 @@ cd ~/bank
 git stash  # Save local changes
 git pull origin main
 git stash pop  # Reapply local changes
+```
+
+### Frontend can't connect to backend (proxy errors)
+
+```bash
+# Check logs for "ECONNREFUSED ::1:5000" errors
+journalctl -u bank-frontend -n 50 | grep proxy
+
+# This indicates IPv6 issue with localhost
+# Fix: Update vite.config.ts to use 127.0.0.1
+cd ~/bank/frontend
+sed -i "s|localhost:5000|127.0.0.1:5000|g" vite.config.ts
+sudo systemctl restart bank-frontend
+
+# Verify fix
+curl http://localhost:3001/api/health
 ```
 
 ---

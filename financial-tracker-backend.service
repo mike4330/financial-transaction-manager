@@ -7,10 +7,10 @@ PartOf=financial-tracker.service
 Type=simple
 User=mike
 Group=mike
-WorkingDirectory=/var/www/html/bank
-Environment=PATH=/usr/bin:/usr/local/bin
-Environment=PYTHONPATH=/var/www/html/bank
-ExecStart=/usr/bin/python3 /var/www/html/bank/api_server.py
+WorkingDirectory=/var/www/html/financial-transaction-manager
+Environment=PATH=/var/www/html/financial-transaction-manager/.venv/bin:/usr/bin
+EnvironmentFile=/var/www/html/financial-transaction-manager/.env
+ExecStart=/var/www/html/financial-transaction-manager/.venv/bin/python3 /var/www/html/financial-transaction-manager/api_server.py
 Restart=always
 RestartSec=3
 StandardOutput=journal
@@ -22,7 +22,7 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=strict
-ReadWritePaths=/var/www/html/bank
+ReadWritePaths=/var/www/html/financial-transaction-manager
 
 # Resource limits
 LimitNOFILE=65536

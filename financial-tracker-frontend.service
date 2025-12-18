@@ -8,12 +8,10 @@ PartOf=financial-tracker.service
 Type=simple
 User=mike
 Group=mike
-WorkingDirectory=/var/www/html/bank/frontend
-Environment=PATH=/usr/bin:/usr/local/bin:/home/mike/.nvm/versions/node/v20.16.0/bin
-Environment=NODE_ENV=development
-Environment=VITE_API_URL=http://localhost:5000
-ExecStartPre=/bin/bash -c 'cd /var/www/html/bank/frontend && npm ci'
-ExecStart=/home/mike/.nvm/versions/node/v20.16.0/bin/npm run dev -- --host 0.0.0.0 --port 3001
+WorkingDirectory=/var/www/html/financial-transaction-manager/frontend
+Environment=PATH=/usr/bin:/usr/local/bin
+Environment=NODE_ENV=production
+ExecStart=/usr/local/bin/pnpm run dev -- --host 0.0.0.0 --port 3001
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -25,7 +23,7 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=strict
-ReadWritePaths=/var/www/html/bank/frontend
+ReadWritePaths=/var/www/html/financial-transaction-manager/frontend
 
 # Resource limits
 LimitNOFILE=65536

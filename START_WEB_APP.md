@@ -13,9 +13,12 @@ This starts the API server on **http://localhost:5000**
 ```bash
 # In terminal 2 (from /var/www/html/bank/)
 cd frontend
-npm run dev
+pnpm run dev
+# OR: npm run dev (if pnpm not installed)
 ```
 This starts the React app on **http://localhost:3001** (or next available port)
+
+**Note:** Use `pnpm` as the recommended package manager. If not installed: `npm install -g pnpm`
 
 ### 3. Access the Application
 Open your browser to: **http://localhost:3001**
