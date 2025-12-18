@@ -489,7 +489,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
   // Generate consistent color for category/subcategory labels
   const getCategoryColor = (text: string, isSubcategory = false) => {
     if (!text) return null;
-    
+
     // Create a simple hash from the text
     let hash = 0;
     for (let i = 0; i < text.length; i++) {
@@ -497,29 +497,29 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    
-    // Generate HSL color with good readability
+
+    // Generate HSL color with good readability and divergence
     const hue = Math.abs(hash) % 360;
-    
+
     if (isSubcategory) {
-      // More vibrant colors for subcategories
-      const saturation = 65 + (Math.abs(hash) % 20); // 65-85%
-      const lightness = 85 + (Math.abs(hash) % 10); // 85-95% for light backgrounds
-      
+      // Vibrant, saturated colors for subcategories
+      const saturation = 70 + (Math.abs(hash) % 25); // 70-95% - much more vibrant
+      const lightness = 75 + (Math.abs(hash) % 15); // 75-90% - darker backgrounds for better contrast
+
       return {
         backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-        color: `hsl(${hue}, ${Math.min(saturation + 20, 100)}%, 25%)`, // Darker text
-        borderColor: `hsl(${hue}, ${saturation}%, ${lightness - 15}%)`
+        color: `hsl(${hue}, ${Math.min(saturation + 10, 100)}%, 20%)`, // Much darker text for contrast
+        borderColor: `hsl(${hue}, ${saturation}%, ${lightness - 20}%)` // Stronger border
       };
     } else {
-      // More subtle colors for categories
-      const saturation = 30 + (Math.abs(hash) % 15); // 30-45%
-      const lightness = 90 + (Math.abs(hash) % 8); // 90-98% for very light backgrounds
-      
+      // Moderate saturation for categories with wider range
+      const saturation = 45 + (Math.abs(hash) % 35); // 45-80% - much wider range for differentiation
+      const lightness = 82 + (Math.abs(hash) % 13); // 82-95% - moderate backgrounds
+
       return {
         backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-        color: `hsl(${hue}, ${Math.min(saturation + 30, 100)}%, 30%)`, // Darker text
-        borderColor: `hsl(${hue}, ${saturation}%, ${lightness - 10}%)`
+        color: `hsl(${hue}, ${Math.min(saturation + 15, 100)}%, 22%)`, // Darker text for better contrast
+        borderColor: `hsl(${hue}, ${saturation}%, ${lightness - 18}%)` // Stronger border
       };
     }
   };
