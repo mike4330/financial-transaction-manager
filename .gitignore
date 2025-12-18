@@ -1,8 +1,6 @@
 test_html_parsing.py
 paypal_email_parser.py
 __pycache__/database.cpython-310.pyc
-transactions/processed/History_for_Account_Z06431462_20250807_064031.csv
-transactions/processed/History_for_Account_Z23693697_20250807_064054.csv
 transactions.db
 transactions_report.html
 __pycache__
