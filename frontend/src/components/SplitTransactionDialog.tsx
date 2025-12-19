@@ -48,20 +48,19 @@ const SplitTransactionDialog: React.FC<SplitTransactionDialogProps> = ({
           }))
         );
       } else {
-        // Create two empty splits with default amounts
-        const half = transaction.amount / 2;
+        // Create two empty splits
         setSplits([
           {
             category_id: null,
             subcategory_id: null,
-            amount: half,
+            amount: 0,
             note: '',
             split_order: 0,
           },
           {
             category_id: null,
             subcategory_id: null,
-            amount: half,
+            amount: 0,
             note: '',
             split_order: 1,
           },
@@ -259,11 +258,22 @@ const SplitTransactionDialog: React.FC<SplitTransactionDialogProps> = ({
               <div className={styles.formGroup}>
                 <label>Amount *</label>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={split.amount}
-                  onChange={(e) => updateSplit(index, 'amount', parseFloat(e.target.value) || 0)}
+                  type="text"
+                  value={split.amount === 0 ? '' : split.amount}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow empty string, negative sign, and valid numbers
+                    if (value === '' || value === '-') {
+                      updateSplit(index, 'amount', 0);
+                    } else {
+                      const parsed = parseFloat(value);
+                      if (!isNaN(parsed)) {
+                        updateSplit(index, 'amount', parsed);
+                      }
+                    }
+                  }}
                   className={styles.input}
+                  placeholder="0.00"
                 />
               </div>
 
