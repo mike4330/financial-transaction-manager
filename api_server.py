@@ -562,7 +562,7 @@ def create_splits(transaction_id):
             return jsonify({"error": "At least 2 splits required"}), 400
 
         # Use TransactionDB methods for validation and creation
-        db = get_db()
+        db = get_transaction_db()
 
         # Validate splits
         is_valid, error_msg = db.validate_split_amounts(transaction_id, splits)
@@ -602,7 +602,7 @@ def update_splits(transaction_id):
         if len(splits) < 2:
             return jsonify({"error": "At least 2 splits required"}), 400
 
-        db = get_db()
+        db = get_transaction_db()
 
         # Validate splits
         is_valid, error_msg = db.validate_split_amounts(transaction_id, splits)
@@ -637,7 +637,7 @@ def delete_splits(transaction_id):
         category_id = request.args.get('category_id', type=int)
         subcategory_id = request.args.get('subcategory_id', type=int)
 
-        db = get_db()
+        db = get_transaction_db()
 
         # Delete splits
         success = db.delete_splits(transaction_id, category_id, subcategory_id)
@@ -658,7 +658,7 @@ def delete_splits(transaction_id):
 def get_transaction_splits(transaction_id):
     """Get all splits for a transaction"""
     try:
-        db = get_db()
+        db = get_transaction_db()
         splits = db.get_splits(transaction_id)
 
         # Check if transaction exists and is split
