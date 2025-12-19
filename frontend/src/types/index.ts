@@ -11,6 +11,22 @@ export interface Transaction {
   subcategory: string | null;
   category_id: number | null;
   subcategory_id: number | null;
+  is_split?: boolean;
+  split_count?: number;
+}
+
+export interface Split {
+  id?: number;
+  transaction_id: number;
+  category_id: number;
+  subcategory_id: number | null;
+  category: string;
+  subcategory: string | null;
+  amount: number;
+  note: string | null;
+  split_order: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Category {
