@@ -2733,3 +2733,275 @@ class TransactionDB:
     def deactivate_pattern(self, pattern_id: int) -> bool:
         """Deactivate a recurring pattern"""
         return self.update_pattern(pattern_id, {'is_active': 0})
+
+    # ============================================================================
+    # SPLIT TRANSACTION METHODS
+    # ============================================================================
+
+    def validate_split_amounts(self, transaction_id: int, splits: List[Dict]) -> Tuple[bool, str]:
+        """
+        Validate that split amounts sum to parent transaction amount
+
+        Args:
+            transaction_id: ID of parent transaction
+            splits: List of split dicts with 'amount' key
+
+        Returns:
+            Tuple of (is_valid: bool, error_message: str)
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            # Get parent transaction amount
+            cursor.execute('SELECT amount FROM transactions WHERE id = ?', (transaction_id,))
+            result = cursor.fetchone()
+
+            if not result:
+                return False, f"Transaction {transaction_id} not found"
+
+            parent_amount = result[0]
+
+            # Validate minimum splits
+            if len(splits) < 2:
+                return False, "At least 2 splits required"
+
+            # Calculate total of split amounts
+            split_total = sum(split.get('amount', 0) for split in splits)
+
+            # Check if amounts match (with floating point tolerance)
+            tolerance = 0.01
+            difference = abs(parent_amount - split_total)
+
+            if difference > tolerance:
+                return False, f"Split amounts (${split_total:.2f}) must equal transaction amount (${parent_amount:.2f}). Difference: ${difference:.2f}"
+
+            # Validate all splits have required fields
+            for i, split in enumerate(splits):
+                if 'category_id' not in split or split['category_id'] is None:
+                    return False, f"Split {i+1} missing category_id"
+                if 'amount' not in split:
+                    return False, f"Split {i+1} missing amount"
+
+            return True, ""
+
+        except Exception as e:
+            return False, f"Validation error: {e}"
+        finally:
+            conn.close()
+
+    def create_splits(self, transaction_id: int, splits: List[Dict]) -> bool:
+        """
+        Create split line items for a transaction
+
+        Args:
+            transaction_id: ID of parent transaction
+            splits: List of dicts with keys: category_id, subcategory_id (optional),
+                    amount, note (optional), split_order (optional)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        # Validate splits first
+        is_valid, error_msg = self.validate_split_amounts(transaction_id, splits)
+        if not is_valid:
+            print(f"Split validation failed: {error_msg}")
+            return False
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            # Begin transaction
+            cursor.execute('BEGIN')
+
+            # Set parent transaction as split and clear categories
+            cursor.execute('''
+                UPDATE transactions
+                SET is_split = 1, category_id = NULL, subcategory_id = NULL
+                WHERE id = ?
+            ''', (transaction_id,))
+
+            # Insert each split
+            for i, split in enumerate(splits):
+                category_id = split['category_id']
+                subcategory_id = split.get('subcategory_id')
+                amount = split['amount']
+                note = split.get('note', '')
+                split_order = split.get('split_order', i)
+
+                cursor.execute('''
+                    INSERT INTO transaction_splits
+                    (transaction_id, category_id, subcategory_id, amount, note, split_order)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (transaction_id, category_id, subcategory_id, amount, note, split_order))
+
+            conn.commit()
+            return True
+
+        except Exception as e:
+            print(f"Error creating splits: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def update_splits(self, transaction_id: int, splits: List[Dict]) -> bool:
+        """
+        Update existing splits for a transaction (delete old, insert new)
+
+        Args:
+            transaction_id: ID of parent transaction
+            splits: List of new split dicts
+
+        Returns:
+            True if successful, False otherwise
+        """
+        # Validate new splits first
+        is_valid, error_msg = self.validate_split_amounts(transaction_id, splits)
+        if not is_valid:
+            print(f"Split validation failed: {error_msg}")
+            return False
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            # Begin transaction
+            cursor.execute('BEGIN')
+
+            # Delete existing splits
+            cursor.execute('DELETE FROM transaction_splits WHERE transaction_id = ?',
+                         (transaction_id,))
+
+            # Insert new splits (reuse logic from create_splits)
+            for i, split in enumerate(splits):
+                category_id = split['category_id']
+                subcategory_id = split.get('subcategory_id')
+                amount = split['amount']
+                note = split.get('note', '')
+                split_order = split.get('split_order', i)
+
+                cursor.execute('''
+                    INSERT INTO transaction_splits
+                    (transaction_id, category_id, subcategory_id, amount, note, split_order)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (transaction_id, category_id, subcategory_id, amount, note, split_order))
+
+            # Ensure parent is still marked as split
+            cursor.execute('''
+                UPDATE transactions
+                SET is_split = 1, category_id = NULL, subcategory_id = NULL
+                WHERE id = ?
+            ''', (transaction_id,))
+
+            conn.commit()
+            return True
+
+        except Exception as e:
+            print(f"Error updating splits: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def delete_splits(self, transaction_id: int, restore_category_id: int = None,
+                     restore_subcategory_id: int = None) -> bool:
+        """
+        Remove all splits and optionally restore categorization
+
+        Args:
+            transaction_id: ID of parent transaction
+            restore_category_id: Optional category to assign after removing splits
+            restore_subcategory_id: Optional subcategory to assign after removing splits
+
+        Returns:
+            True if successful, False otherwise
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            # Begin transaction
+            cursor.execute('BEGIN')
+
+            # Delete splits
+            cursor.execute('DELETE FROM transaction_splits WHERE transaction_id = ?',
+                         (transaction_id,))
+
+            # Update parent transaction
+            cursor.execute('''
+                UPDATE transactions
+                SET is_split = 0, category_id = ?, subcategory_id = ?
+                WHERE id = ?
+            ''', (restore_category_id, restore_subcategory_id, transaction_id))
+
+            conn.commit()
+            return True
+
+        except Exception as e:
+            print(f"Error deleting splits: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def get_splits(self, transaction_id: int) -> List[Dict]:
+        """
+        Get all splits for a transaction with category names
+
+        Args:
+            transaction_id: ID of parent transaction
+
+        Returns:
+            List of split dicts with category and subcategory names included
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute('''
+                SELECT
+                    ts.id,
+                    ts.transaction_id,
+                    ts.category_id,
+                    ts.subcategory_id,
+                    c.name as category,
+                    s.name as subcategory,
+                    ts.amount,
+                    ts.note,
+                    ts.split_order,
+                    ts.created_at,
+                    ts.updated_at
+                FROM transaction_splits ts
+                JOIN categories c ON ts.category_id = c.id
+                LEFT JOIN subcategories s ON ts.subcategory_id = s.id
+                WHERE ts.transaction_id = ?
+                ORDER BY ts.split_order ASC
+            ''', (transaction_id,))
+
+            rows = cursor.fetchall()
+
+            splits = []
+            for row in rows:
+                splits.append({
+                    'id': row[0],
+                    'transaction_id': row[1],
+                    'category_id': row[2],
+                    'subcategory_id': row[3],
+                    'category': row[4],
+                    'subcategory': row[5],
+                    'amount': row[6],
+                    'note': row[7],
+                    'split_order': row[8],
+                    'created_at': row[9],
+                    'updated_at': row[10]
+                })
+
+            return splits
+
+        except Exception as e:
+            print(f"Error getting splits: {e}")
+            return []
+        finally:
+            conn.close()
