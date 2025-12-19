@@ -1192,3 +1192,87 @@
 .copyButton:hover {
   background-color: #047857;
 }
+/* Split transaction styles */
+.splitIndicator {
+  background-color: #f5b461;
+  color: #1a1a1a;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+:global(.dark) .splitIndicator {
+  background-color: #f5b461;
+  color: #1a1a1a;
+}
+
+.splitButton {
+  background-color: #f5b461;
+  color: #1a1a1a;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+
+.splitButton:hover {
+  background-color: #f7c482;
+}
+
+.splitBreakdown {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+:global(.dark) .splitBreakdown {
+  background-color: #222;
+  border-color: #333;
+}
+
+.splitTitle {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: #f5b461;
+}
+
+.splitTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.splitTable th,
+.splitTable td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+:global(.dark) .splitTable th,
+:global(.dark) .splitTable td {
+  border-color: #333;
+}
+
+.splitTable th {
+  background-color: #f3f3f3;
+  font-weight: 600;
+  color: #333;
+}
+
+:global(.dark) .splitTable th {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.splitLoading {
+  color: #999;
+  font-style: italic;
+  margin: 0;
+}

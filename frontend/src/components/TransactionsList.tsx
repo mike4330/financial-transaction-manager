@@ -2,21 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import styles from './TransactionsList.module.css';
 import { usePreferences } from '../contexts/PreferencesContext';
+import SplitTransactionDialog from './SplitTransactionDialog';
+import { Transaction as TransactionType, Split } from '../types';
+import { transactionApi } from '../utils/api';
 
-interface Transaction {
-  id: number;
-  date: string;
-  account: string;
-  amount: number;
-  payee: string;
-  description: string;
+interface Transaction extends TransactionType {
   action: string;
-  transaction_type: string;
-  category: string;
-  subcategory: string;
-  category_id: number | null;
-  subcategory_id: number | null;
-  note: string | null;
+  description: string;
 }
 
 interface Category {
@@ -74,6 +66,9 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
   const [selectedBulkCategory, setSelectedBulkCategory] = useState<number | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+  const [selectedTransactionForSplit, setSelectedTransactionForSplit] = useState<Transaction | null>(null);
+  const [transactionSplits, setTransactionSplits] = useState<Map<number, Split[]>>(new Map());
   const pageSize = 50;
 
   // Get preferences
@@ -296,7 +291,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
       }
 
       // Update the transaction in the local state
-      setTransactions(prev => prev.map(t => 
+      setTransactions(prev => prev.map(t =>
         t.id === transactionId ? { ...t, note: pendingNote || null } : t
       ));
 
@@ -304,6 +299,36 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
       setPendingNote('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update note');
+    }
+  };
+
+  // Split transaction functions
+  const handleSplitTransaction = async (transaction: Transaction) => {
+    // Load existing splits if transaction is already split
+    if (transaction.is_split) {
+      try {
+        const response = await transactionApi.getSplits(transaction.id);
+        setTransactionSplits(prev => new Map(prev).set(transaction.id, response.splits));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load splits');
+      }
+    }
+
+    setSelectedTransactionForSplit(transaction);
+    setSplitDialogOpen(true);
+  };
+
+  const handleSplitCreated = async () => {
+    // Refresh transactions to get updated is_split and split_count
+    await fetchData();
+  };
+
+  const loadSplitsForTransaction = async (transactionId: number) => {
+    try {
+      const response = await transactionApi.getSplits(transactionId);
+      setTransactionSplits(prev => new Map(prev).set(transactionId, response.splits));
+    } catch (err) {
+      console.error('Failed to load splits:', err);
     }
   };
 
@@ -805,7 +830,11 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
                         {formatCurrency(transaction.amount)}
                       </td>
                       <td className={`${styles.tableCell} ${styles.tableCellCategory}`}>
-                        {editingTransaction === transaction.id ? (
+                        {transaction.is_split ? (
+                          <span className={`${styles.categorySpan} ${styles.splitIndicator}`}>
+                            Split ({transaction.split_count || 0})
+                          </span>
+                        ) : editingTransaction === transaction.id ? (
                           <div className={styles.editContainer} onClick={(e) => e.stopPropagation()}>
                             <select
                               value={pendingEdit?.categoryId || ''}
@@ -854,7 +883,9 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
                         )}
                       </td>
                       <td className={`${styles.tableCell} ${styles.tableCellCategory}`}>
-                        {editingTransaction === transaction.id && pendingEdit?.categoryId ? (
+                        {transaction.is_split ? (
+                          <span className={styles.categorySpan}>-</span>
+                        ) : editingTransaction === transaction.id && pendingEdit?.categoryId ? (
                           <div className={styles.editContainer} onClick={(e) => e.stopPropagation()}>
                             <select
                               value={pendingEdit?.subcategoryId || ''}
@@ -953,7 +984,73 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
                               <span className={styles.detailLabel}>Transaction ID:</span>
                               <span className={styles.detailValue}>{transaction.id}</span>
                             </div>
+                            <div className={styles.detailItem}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSplitTransaction(transaction);
+                                }}
+                                className={styles.splitButton}
+                              >
+                                {transaction.is_split ? 'Edit Splits' : 'Split Transaction'}
+                              </button>
+                            </div>
                           </div>
+
+                          {transaction.is_split && (
+                            <div className={styles.splitBreakdown}>
+                              <h4 className={styles.splitTitle}>Split Details:</h4>
+                              {(() => {
+                                const splits = transactionSplits.get(transaction.id);
+                                if (!splits) {
+                                  loadSplitsForTransaction(transaction.id);
+                                  return <p className={styles.splitLoading}>Loading splits...</p>;
+                                }
+                                return (
+                                  <table className={styles.splitTable}>
+                                    <thead>
+                                      <tr>
+                                        <th>Category</th>
+                                        <th>Subcategory</th>
+                                        <th>Amount</th>
+                                        <th>Note</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {splits.map((split, index) => (
+                                        <tr key={split.id || index}>
+                                          <td>
+                                            <span
+                                              className={styles.categorySpan}
+                                              style={getCategoryColor(split.category, false)}
+                                            >
+                                              {split.category}
+                                            </span>
+                                          </td>
+                                          <td>
+                                            {split.subcategory ? (
+                                              <span
+                                                className={styles.categorySpan}
+                                                style={getCategoryColor(split.subcategory, true)}
+                                              >
+                                                {split.subcategory}
+                                              </span>
+                                            ) : (
+                                              '-'
+                                            )}
+                                          </td>
+                                          <td className={split.amount < 0 ? styles.amountNegative : styles.amountPositive}>
+                                            {formatCurrency(split.amount)}
+                                          </td>
+                                          <td>{split.note || '-'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                );
+                              })()}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}
@@ -1087,6 +1184,22 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
             </div>
           </div>
         </div>
+      )}
+
+      {/* Split Transaction Dialog */}
+      {selectedTransactionForSplit && (
+        <SplitTransactionDialog
+          isOpen={splitDialogOpen}
+          onClose={() => {
+            setSplitDialogOpen(false);
+            setSelectedTransactionForSplit(null);
+          }}
+          transaction={selectedTransactionForSplit}
+          categories={categories}
+          subcategories={subcategories}
+          existingSplits={transactionSplits.get(selectedTransactionForSplit.id)}
+          onSplitCreated={handleSplitCreated}
+        />
       )}
     </div>
   );
