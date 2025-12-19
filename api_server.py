@@ -299,7 +299,7 @@ def get_transactions():
         
         # Build query with filters
         query = """
-        SELECT 
+        SELECT
             t.id,
             t.run_date as date,
             t.account,
@@ -313,7 +313,9 @@ def get_transactions():
             c.name as category,
             s.name as subcategory,
             t.category_id,
-            t.subcategory_id
+            t.subcategory_id,
+            t.is_split,
+            (SELECT COUNT(*) FROM transaction_splits WHERE transaction_id = t.id) as split_count
         FROM transactions t
         LEFT JOIN categories c ON t.category_id = c.id
         LEFT JOIN subcategories s ON t.subcategory_id = s.id
@@ -541,6 +543,149 @@ def bulk_delete():
     except Exception as e:
         logger.error(f"Error bulk deleting: {e}")
         return jsonify({"error": str(e)}), 500
+
+# ============================================================================
+# SPLIT TRANSACTION ENDPOINTS
+# ============================================================================
+
+@app.route('/api/transactions/<int:transaction_id>/splits', methods=['POST'])
+def create_splits(transaction_id):
+    """Create splits for a transaction"""
+    try:
+        data = request.get_json()
+        splits = data.get('splits', [])
+
+        if not splits:
+            return jsonify({"error": "No splits provided"}), 400
+
+        if len(splits) < 2:
+            return jsonify({"error": "At least 2 splits required"}), 400
+
+        # Use TransactionDB methods for validation and creation
+        db = get_db()
+
+        # Validate splits
+        is_valid, error_msg = db.validate_split_amounts(transaction_id, splits)
+        if not is_valid:
+            return jsonify({"error": error_msg}), 400
+
+        # Create splits
+        success = db.create_splits(transaction_id, splits)
+
+        if not success:
+            return jsonify({"error": "Failed to create splits"}), 500
+
+        # Retrieve created splits to return
+        created_splits = db.get_splits(transaction_id)
+
+        return jsonify({
+            "message": "Splits created successfully",
+            "transaction_id": transaction_id,
+            "split_count": len(created_splits),
+            "splits": created_splits
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Error creating splits for transaction {transaction_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/transactions/<int:transaction_id>/splits', methods=['PUT'])
+def update_splits(transaction_id):
+    """Update splits for a transaction"""
+    try:
+        data = request.get_json()
+        splits = data.get('splits', [])
+
+        if not splits:
+            return jsonify({"error": "No splits provided"}), 400
+
+        if len(splits) < 2:
+            return jsonify({"error": "At least 2 splits required"}), 400
+
+        db = get_db()
+
+        # Validate splits
+        is_valid, error_msg = db.validate_split_amounts(transaction_id, splits)
+        if not is_valid:
+            return jsonify({"error": error_msg}), 400
+
+        # Update splits
+        success = db.update_splits(transaction_id, splits)
+
+        if not success:
+            return jsonify({"error": "Failed to update splits"}), 500
+
+        # Retrieve updated splits to return
+        updated_splits = db.get_splits(transaction_id)
+
+        return jsonify({
+            "message": "Splits updated successfully",
+            "transaction_id": transaction_id,
+            "split_count": len(updated_splits),
+            "splits": updated_splits
+        })
+
+    except Exception as e:
+        logger.error(f"Error updating splits for transaction {transaction_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/transactions/<int:transaction_id>/splits', methods=['DELETE'])
+def delete_splits(transaction_id):
+    """Delete all splits for a transaction"""
+    try:
+        # Optional: restore category after removing splits
+        category_id = request.args.get('category_id', type=int)
+        subcategory_id = request.args.get('subcategory_id', type=int)
+
+        db = get_db()
+
+        # Delete splits
+        success = db.delete_splits(transaction_id, category_id, subcategory_id)
+
+        if not success:
+            return jsonify({"error": "Failed to delete splits"}), 500
+
+        return jsonify({
+            "message": "Splits deleted successfully",
+            "transaction_id": transaction_id
+        })
+
+    except Exception as e:
+        logger.error(f"Error deleting splits for transaction {transaction_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/transactions/<int:transaction_id>/splits', methods=['GET'])
+def get_transaction_splits(transaction_id):
+    """Get all splits for a transaction"""
+    try:
+        db = get_db()
+        splits = db.get_splits(transaction_id)
+
+        # Check if transaction exists and is split
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT is_split FROM transactions WHERE id = ?', (transaction_id,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if not result:
+            return jsonify({"error": "Transaction not found"}), 404
+
+        is_split = result['is_split']
+
+        return jsonify({
+            "transaction_id": transaction_id,
+            "is_split": bool(is_split),
+            "splits": splits
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting splits for transaction {transaction_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================================================
+# END SPLIT TRANSACTION ENDPOINTS
+# ============================================================================
 
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
