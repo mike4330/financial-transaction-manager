@@ -16,7 +16,7 @@ interface SplitTransactionDialogProps {
 interface SplitFormData {
   category_id: number | null;
   subcategory_id: number | null;
-  amount: number;
+  amount: string | number;
   note: string;
   split_order: number;
 }
@@ -107,7 +107,10 @@ const SplitTransactionDialog: React.FC<SplitTransactionDialogProps> = ({
   };
 
   const calculateTotal = () => {
-    return splits.reduce((sum, split) => sum + (split.amount || 0), 0);
+    return splits.reduce((sum, split) => {
+      const amount = typeof split.amount === 'string' ? parseFloat(split.amount) : split.amount;
+      return sum + (isNaN(amount) ? 0 : amount);
+    }, 0);
   };
 
   const calculateDifference = () => {
@@ -132,9 +135,9 @@ const SplitTransactionDialog: React.FC<SplitTransactionDialogProps> = ({
     if (splits.length === 0) return;
 
     const amountPerSplit = transaction.amount / splits.length;
-    const newSplits = splits.map((split, index) => ({
+    const newSplits = splits.map((split) => ({
       ...split,
-      amount: amountPerSplit,
+      amount: amountPerSplit.toFixed(2),
     }));
     setSplits(newSplits);
   };
@@ -152,7 +155,7 @@ const SplitTransactionDialog: React.FC<SplitTransactionDialogProps> = ({
       const splitData = splits.map((split, index) => ({
         category_id: split.category_id!,
         subcategory_id: split.subcategory_id,
-        amount: split.amount,
+        amount: typeof split.amount === 'string' ? parseFloat(split.amount) : split.amount,
         note: split.note || null,
         split_order: index,
       }));
@@ -259,17 +262,13 @@ const SplitTransactionDialog: React.FC<SplitTransactionDialogProps> = ({
                 <label>Amount *</label>
                 <input
                   type="text"
-                  value={split.amount === 0 ? '' : split.amount}
+                  value={split.amount === 0 || split.amount === '' ? '' : split.amount}
                   onChange={(e) => {
                     const value = e.target.value;
-                    // Allow empty string, negative sign, and valid numbers
-                    if (value === '' || value === '-') {
-                      updateSplit(index, 'amount', 0);
-                    } else {
-                      const parsed = parseFloat(value);
-                      if (!isNaN(parsed)) {
-                        updateSplit(index, 'amount', parsed);
-                      }
+                    // Allow empty string, minus sign, periods, and digits
+                    // This regex allows: "-", "5", "5.", "5.5", "-5", "-5.", "-5.50", etc.
+                    if (value === '' || /^-?\d*\.?\d*$/.test(value)) {
+                      updateSplit(index, 'amount', value === '' ? 0 : value);
                     }
                   }}
                   className={styles.input}
