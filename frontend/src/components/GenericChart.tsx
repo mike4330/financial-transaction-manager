@@ -198,6 +198,9 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
           if (dateFilter.startDate) {
             endpointUrl.searchParams.append('start_date', dateFilter.startDate);
           }
+          if (dateFilter.endDate) {
+            endpointUrl.searchParams.append('end_date', dateFilter.endDate);
+          }
           endpointUrl.searchParams.append('limit', '1000');
           apiUrl = endpointUrl.toString();
         } else {
@@ -207,9 +210,12 @@ export const GenericChart: React.FC<GenericChartProps> = ({ config }) => {
             subcategory: config.subcategory,
             limit: '1000'
           });
-          
+
           if (dateFilter.startDate) {
             params.append('start_date', dateFilter.startDate);
+          }
+          if (dateFilter.endDate) {
+            params.append('end_date', dateFilter.endDate);
           }
           apiUrl = `/api/transactions?${params.toString()}`;
         }

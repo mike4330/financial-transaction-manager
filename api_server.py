@@ -287,6 +287,7 @@ def get_transactions():
         subcategory = request.args.get('subcategory')
         transaction_type = request.args.get('type')
         symbol = request.args.get('symbol')
+        payee = request.args.get('payee')
         exclude_investments = request.args.get('exclude_investments') == 'true'
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
@@ -347,7 +348,11 @@ def get_transactions():
         if symbol:
             query += " AND t.symbol = ?"
             params.append(symbol)
-        
+
+        if payee:
+            query += " AND t.payee = ?"
+            params.append(payee)
+
         if exclude_investments:
             query += " AND t.type NOT IN ('Investment Trade', 'Dividend', 'Reinvestment', 'Dividend Taxes', 'Brokerage Fee')"
         
@@ -715,6 +720,263 @@ def get_categories():
         
     except Exception as e:
         logger.error(f"Error fetching categories: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/categories', methods=['POST'])
+def create_category():
+    """Create a new category"""
+    try:
+        data = request.get_json()
+        name = data.get('name')
+
+        if not name:
+            return jsonify({"error": "Category name is required"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if category already exists
+        existing = cursor.execute("SELECT id FROM categories WHERE name = ?", (name,)).fetchone()
+        if existing:
+            conn.close()
+            return jsonify({"error": "Category already exists"}), 400
+
+        # Insert new category
+        cursor.execute("INSERT INTO categories (name) VALUES (?)", (name,))
+        category_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        logger.info(f"Created new category: {name} (ID: {category_id})")
+
+        return jsonify({
+            "success": True,
+            "message": "Category created successfully",
+            "category": {"id": category_id, "name": name}
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Error creating category: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/categories/<int:category_id>', methods=['PUT'])
+def update_category(category_id):
+    """Update a category"""
+    try:
+        data = request.get_json()
+        name = data.get('name')
+
+        if not name:
+            return jsonify({"error": "Category name is required"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if category exists
+        existing = cursor.execute("SELECT name FROM categories WHERE id = ?", (category_id,)).fetchone()
+        if not existing:
+            conn.close()
+            return jsonify({"error": "Category not found"}), 404
+
+        # Check if new name conflicts with another category
+        conflict = cursor.execute("SELECT id FROM categories WHERE name = ? AND id != ?", (name, category_id)).fetchone()
+        if conflict:
+            conn.close()
+            return jsonify({"error": "Category name already exists"}), 400
+
+        # Update category
+        cursor.execute("UPDATE categories SET name = ? WHERE id = ?", (name, category_id))
+        conn.commit()
+        conn.close()
+
+        logger.info(f"Updated category ID {category_id}: {existing['name']} → {name}")
+
+        return jsonify({
+            "success": True,
+            "message": "Category updated successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"Error updating category {category_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/categories/<int:category_id>', methods=['DELETE'])
+def delete_category(category_id):
+    """Delete a category"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if category exists
+        category = cursor.execute("SELECT name FROM categories WHERE id = ?", (category_id,)).fetchone()
+        if not category:
+            conn.close()
+            return jsonify({"error": "Category not found"}), 404
+
+        # Check if category has transactions
+        transaction_count = cursor.execute("SELECT COUNT(*) as count FROM transactions WHERE category_id = ?", (category_id,)).fetchone()['count']
+
+        if transaction_count > 0:
+            conn.close()
+            return jsonify({"error": f"Cannot delete category: {transaction_count} transactions are using it"}), 400
+
+        # Delete subcategories first
+        cursor.execute("DELETE FROM subcategories WHERE category_id = ?", (category_id,))
+
+        # Delete category
+        cursor.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+        conn.commit()
+        conn.close()
+
+        logger.info(f"Deleted category: {category['name']} (ID: {category_id})")
+
+        return jsonify({
+            "success": True,
+            "message": "Category deleted successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"Error deleting category {category_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/categories/<int:category_id>/subcategories', methods=['POST'])
+def create_subcategory(category_id):
+    """Create a new subcategory"""
+    try:
+        data = request.get_json()
+        name = data.get('name')
+
+        if not name:
+            return jsonify({"error": "Subcategory name is required"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if category exists
+        category = cursor.execute("SELECT name FROM categories WHERE id = ?", (category_id,)).fetchone()
+        if not category:
+            conn.close()
+            return jsonify({"error": "Category not found"}), 404
+
+        # Check if subcategory already exists in this category
+        existing = cursor.execute(
+            "SELECT id FROM subcategories WHERE name = ? AND category_id = ?",
+            (name, category_id)
+        ).fetchone()
+        if existing:
+            conn.close()
+            return jsonify({"error": "Subcategory already exists in this category"}), 400
+
+        # Insert new subcategory
+        cursor.execute("INSERT INTO subcategories (name, category_id) VALUES (?, ?)", (name, category_id))
+        subcategory_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        logger.info(f"Created new subcategory: {name} (ID: {subcategory_id}) under {category['name']}")
+
+        return jsonify({
+            "success": True,
+            "message": "Subcategory created successfully",
+            "subcategory": {
+                "id": subcategory_id,
+                "name": name,
+                "category_id": category_id,
+                "category_name": category['name']
+            }
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Error creating subcategory for category {category_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/subcategories/<int:subcategory_id>', methods=['PUT'])
+def update_subcategory(subcategory_id):
+    """Update a subcategory"""
+    try:
+        data = request.get_json()
+        name = data.get('name')
+
+        if not name:
+            return jsonify({"error": "Subcategory name is required"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if subcategory exists
+        existing = cursor.execute(
+            "SELECT s.name, s.category_id FROM subcategories s WHERE s.id = ?",
+            (subcategory_id,)
+        ).fetchone()
+        if not existing:
+            conn.close()
+            return jsonify({"error": "Subcategory not found"}), 404
+
+        # Check if new name conflicts with another subcategory in the same category
+        conflict = cursor.execute(
+            "SELECT id FROM subcategories WHERE name = ? AND category_id = ? AND id != ?",
+            (name, existing['category_id'], subcategory_id)
+        ).fetchone()
+        if conflict:
+            conn.close()
+            return jsonify({"error": "Subcategory name already exists in this category"}), 400
+
+        # Update subcategory
+        cursor.execute("UPDATE subcategories SET name = ? WHERE id = ?", (name, subcategory_id))
+        conn.commit()
+        conn.close()
+
+        logger.info(f"Updated subcategory ID {subcategory_id}: {existing['name']} → {name}")
+
+        return jsonify({
+            "success": True,
+            "message": "Subcategory updated successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"Error updating subcategory {subcategory_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/subcategories/<int:subcategory_id>', methods=['DELETE'])
+def delete_subcategory(subcategory_id):
+    """Delete a subcategory"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if subcategory exists
+        subcategory = cursor.execute(
+            "SELECT s.name FROM subcategories s WHERE s.id = ?",
+            (subcategory_id,)
+        ).fetchone()
+        if not subcategory:
+            conn.close()
+            return jsonify({"error": "Subcategory not found"}), 404
+
+        # Check if subcategory has transactions
+        transaction_count = cursor.execute(
+            "SELECT COUNT(*) as count FROM transactions WHERE subcategory_id = ?",
+            (subcategory_id,)
+        ).fetchone()['count']
+
+        if transaction_count > 0:
+            conn.close()
+            return jsonify({"error": f"Cannot delete subcategory: {transaction_count} transactions are using it"}), 400
+
+        # Delete subcategory
+        cursor.execute("DELETE FROM subcategories WHERE id = ?", (subcategory_id,))
+        conn.commit()
+        conn.close()
+
+        logger.info(f"Deleted subcategory: {subcategory['name']} (ID: {subcategory_id})")
+
+        return jsonify({
+            "success": True,
+            "message": "Subcategory deleted successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"Error deleting subcategory {subcategory_id}: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/stats', methods=['GET'])

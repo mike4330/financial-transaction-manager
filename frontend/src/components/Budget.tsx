@@ -1072,24 +1072,24 @@ const Budget: React.FC = () => {
                   <div className={styles.subcategoryHeader}>
                     <span className={styles.subcategoryName}>{item.subcategory}</span>
                     <div className={styles.progressContainer}>
-                      <div 
+                      <div
                         className={styles.progressBar}
                         onClick={() => handleProgressBarClick(item)}
                         title="Click to view transactions"
                       >
                         {/* Actual amount bar */}
-                        <div 
+                        <div
                           className={`${styles.progressFill} ${styles.actualFill}`}
-                          style={{ 
+                          style={{
                             width: getProgressWidth(item.actual, item.budgeted, item.type),
                             backgroundColor: getProgressColor(item.actual, item.budgeted, item.type),
                           }}
                         />
                         {/* Expected amount bar (if available) */}
                         {item.expected && item.expected > 0 && (
-                          <div 
+                          <div
                             className={`${styles.progressFill} ${styles.expectedFill}`}
-                            style={{ 
+                            style={{
                               width: getProgressWidth(item.expected, item.budgeted, item.type),
                               backgroundColor: 'rgba(59, 130, 246, 0.3)',
                             }}
@@ -1112,50 +1112,50 @@ const Budget: React.FC = () => {
                         </span>
                       </div>
                     </div>
-                  </div>
-                  <div className={styles.editSection}>
-                    {editingItem === item.id ? (
-                      <div className={styles.editContainer}>
-                        <input
-                          type="number"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          className={styles.editInput}
-                          min="0"
-                          step="0.01"
-                          autoFocus
-                        />
-                        <button 
-                          onClick={() => acceptEdit(item.id)}
-                          className={styles.acceptButton}
-                          title="Accept changes"
+                    <div className={styles.editSection}>
+                      {editingItem === item.id ? (
+                        <div className={styles.editContainer}>
+                          <input
+                            type="number"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className={styles.editInput}
+                            min="0"
+                            step="0.01"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => acceptEdit(item.id)}
+                            className={styles.acceptButton}
+                            title="Accept changes"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            className={styles.cancelButton}
+                            title="Cancel changes"
+                          >
+                            ✕
+                          </button>
+                          <button
+                            onClick={() => handleAutoUpdate(item.id)}
+                            className={styles.autoButton}
+                            title="Auto-update from transactions"
+                          >
+                            Auto
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className={styles.budgetedAmountEditable}
+                          onClick={() => startEditing(item.id, item.budgeted)}
+                          title="Click to edit budget amount"
                         >
-                          ✓
-                        </button>
-                        <button 
-                          onClick={cancelEditing}
-                          className={styles.cancelButton}
-                          title="Cancel changes"
-                        >
-                          ✕
-                        </button>
-                        <button 
-                          onClick={() => handleAutoUpdate(item.id)}
-                          className={styles.autoButton}
-                          title="Auto-update from transactions"
-                        >
-                          Auto
-                        </button>
-                      </div>
-                    ) : (
-                      <span 
-                        className={styles.budgetedAmountEditable}
-                        onClick={() => startEditing(item.id, item.budgeted)}
-                        title="Click to edit budget amount"
-                      >
-                        Budget: ${item.budgeted.toLocaleString()}
-                      </span>
-                    )}
+                          Budget: ${item.budgeted.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1174,24 +1174,24 @@ const Budget: React.FC = () => {
                   <div className={styles.subcategoryHeader}>
                     <span className={styles.subcategoryName}>{item.subcategory}</span>
                     <div className={styles.progressContainer}>
-                      <div 
+                      <div
                         className={styles.progressBar}
                         onClick={() => handleProgressBarClick(item)}
                         title="Click to view transactions"
                       >
                         {/* Actual amount bar */}
-                        <div 
+                        <div
                           className={`${styles.progressFill} ${styles.actualFill}`}
-                          style={{ 
+                          style={{
                             width: getProgressWidth(item.actual, item.budgeted, item.type),
                             backgroundColor: getProgressColor(item.actual, item.budgeted, item.type),
                           }}
                         />
                         {/* Expected amount bar (if available) */}
                         {item.expected && item.expected > 0 && (
-                          <div 
+                          <div
                             className={`${styles.progressFill} ${styles.expectedFill}`}
-                            style={{ 
+                            style={{
                               width: getProgressWidth(item.expected, item.budgeted, item.type),
                               backgroundColor: 'rgba(59, 130, 246, 0.3)',
                             }}
@@ -1214,50 +1214,50 @@ const Budget: React.FC = () => {
                         </span>
                       </div>
                     </div>
-                  </div>
-                  <div className={styles.editSection}>
-                    {editingItem === item.id ? (
-                      <div className={styles.editContainer}>
-                        <input
-                          type="number"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          className={styles.editInput}
-                          min="0"
-                          step="0.01"
-                          autoFocus
-                        />
-                        <button 
-                          onClick={() => acceptEdit(item.id)}
-                          className={styles.acceptButton}
-                          title="Accept changes"
+                    <div className={styles.editSection}>
+                      {editingItem === item.id ? (
+                        <div className={styles.editContainer}>
+                          <input
+                            type="number"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className={styles.editInput}
+                            min="0"
+                            step="0.01"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => acceptEdit(item.id)}
+                            className={styles.acceptButton}
+                            title="Accept changes"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            className={styles.cancelButton}
+                            title="Cancel changes"
+                          >
+                            ✕
+                          </button>
+                          <button
+                            onClick={() => handleAutoUpdate(item.id)}
+                            className={styles.autoButton}
+                            title="Auto-update from transactions"
+                          >
+                            Auto
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className={styles.budgetedAmountEditable}
+                          onClick={() => startEditing(item.id, item.budgeted)}
+                          title="Click to edit budget amount"
                         >
-                          ✓
-                        </button>
-                        <button 
-                          onClick={cancelEditing}
-                          className={styles.cancelButton}
-                          title="Cancel changes"
-                        >
-                          ✕
-                        </button>
-                        <button 
-                          onClick={() => handleAutoUpdate(item.id)}
-                          className={styles.autoButton}
-                          title="Auto-update from transactions"
-                        >
-                          Auto
-                        </button>
-                      </div>
-                    ) : (
-                      <span 
-                        className={styles.budgetedAmountEditable}
-                        onClick={() => startEditing(item.id, item.budgeted)}
-                        title="Click to edit budget amount"
-                      >
-                        Budget: ${item.budgeted.toLocaleString()}
-                      </span>
-                    )}
+                          Budget: ${item.budgeted.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

@@ -66,9 +66,11 @@ export const TimeRangeProvider: React.FC<TimeRangeProviderProps> = ({ children }
       return `${year}-${month}-${day}`;
     };
 
+    const endDate = new Date(now);
+
     return {
-      startDate: formatDate(startDate)
-      // No end date - let it include everything up to now
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate)
     };
   };
 

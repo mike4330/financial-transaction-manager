@@ -15,6 +15,11 @@
   border: 1px solid #e5e7eb;
 }
 
+:global(.dark) .statCard {
+  background-color: #252017;
+  border-color: #3a2f20;
+}
+
 .statValue {
   font-size: 1.5rem;
   font-weight: bold;
@@ -22,10 +27,18 @@
   margin-bottom: 0.25rem;
 }
 
+:global(.dark) .statValue {
+  color: #f5f5f4;
+}
+
 .statLabel {
   color: #6b7280;
   font-size: 0.875rem;
   font-weight: 500;
+}
+
+:global(.dark) .statLabel {
+  color: #a8a29e;
 }
 
 /* Tree view styles */
@@ -48,15 +61,27 @@
   margin-bottom: 0.5rem;
 }
 
+:global(.dark) .categoryItem {
+  border-bottom-color: #3a2f20;
+}
+
 .categoryName {
   font-weight: bold;
   color: #1f2937;
   font-size: 1rem;
 }
 
+:global(.dark) .categoryName {
+  color: #f5f5f4;
+}
+
 .categoryStats {
   color: #6b7280;
   font-size: 0.875rem;
+}
+
+:global(.dark) .categoryStats {
+  color: #a8a29e;
 }
 
 .subcategoryList {
@@ -77,9 +102,17 @@
   font-weight: bold;
 }
 
+:global(.dark) .subcategoryPrefix {
+  color: #78716c;
+}
+
 .subcategoryName {
   color: #374151;
   flex-grow: 1;
+}
+
+:global(.dark) .subcategoryName {
+  color: #e7e5e4;
 }
 
 .subcategoryButton {
@@ -96,10 +129,19 @@
   flex-grow: 1;
 }
 
+:global(.dark) .subcategoryButton {
+  color: #60a5fa;
+}
+
 .subcategoryButton:hover {
   color: #1d4ed8;
   background-color: #f3f4f6;
   text-decoration: none;
+}
+
+:global(.dark) .subcategoryButton:hover {
+  color: #93c5fd;
+  background-color: #3a2f20;
 }
 
 .subcategoryButton:focus {
@@ -108,10 +150,18 @@
   border-radius: 2px;
 }
 
+:global(.dark) .subcategoryButton:focus {
+  outline-color: #60a5fa;
+}
+
 .subcategoryStats {
   color: #6b7280;
   font-size: 0.8125rem;
   margin-left: 1rem;
+}
+
+:global(.dark) .subcategoryStats {
+  color: #a8a29e;
 }
 
 /* Loading and error states */
@@ -121,9 +171,93 @@
   color: #6b7280;
 }
 
+:global(.dark) .loading {
+  color: #a8a29e;
+}
+
 .error {
   color: #dc2626;
   background-color: #fef2f2;
   border: 1px solid #fecaca;
   border-radius: 6px;
+}
+
+:global(.dark) .error {
+  color: #fca5a5;
+  background-color: #3a1a1a;
+  border-color: #7c2d2d;
+}
+
+/* Category Management Styles */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.addButton {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.addButton:hover {
+  background: #2980b9;
+}
+
+:global(.dark) .addButton {
+  background: #2563eb;
+}
+
+:global(.dark) .addButton:hover {
+  background: #1d4ed8;
+}
+
+.categoryActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.iconButton:hover {
+  background-color: #f3f4f6;
+}
+
+:global(.dark) .iconButton:hover {
+  background-color: #3a2f20;
+}
+
+.editButton {
+  color: #2563eb;
+}
+
+.deleteButton {
+  color: #dc2626;
+}
+
+:global(.dark) .deleteButton {
+  color: #f87171;
+}
+
+.subcategoryActions {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
 }
