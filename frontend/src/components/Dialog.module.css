@@ -23,6 +23,11 @@
   animation: dialogEnter 0.2s ease-out;
 }
 
+:global(.dark) .dialog {
+  background: #252017;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
 @keyframes dialogEnter {
   from {
     opacity: 0;
@@ -42,6 +47,10 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
+:global(.dark) .header {
+  border-bottom-color: #3a2f20;
+}
+
 .titleSection {
   display: flex;
   align-items: center;
@@ -58,6 +67,10 @@
   font-weight: 600;
   color: #1f2937;
   margin: 0;
+}
+
+:global(.dark) .title {
+  color: #f5f5f4;
 }
 
 .closeButton {
@@ -80,6 +93,15 @@
 .closeButton:hover {
   background-color: #f3f4f6;
   color: #374151;
+}
+
+:global(.dark) .closeButton {
+  color: #a8a29e;
+}
+
+:global(.dark) .closeButton:hover {
+  background-color: #3a2f20;
+  color: #e7e5e4;
 }
 
 .content {

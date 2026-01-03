@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, CreditCard, Users, TreePine, DollarSign, RotateCcw, Settings, TrendingUp } from 'lucide-react';
+import { BarChart3, CreditCard, Users, TreePine, DollarSign, RotateCcw, Settings, TrendingUp, ChevronDown } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { FileUpload } from './FileUpload';
 
@@ -12,16 +12,38 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ stats, onShowPreferences }) => {
   const location = useLocation();
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const setupRef = useRef<HTMLDivElement>(null);
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: BarChart3 },
     { path: '/transactions', label: 'Transactions', icon: CreditCard },
-    { path: '/treemap', label: 'Categories', icon: TreePine },
     { path: '/budget', label: 'Budget', icon: DollarSign },
-    { path: '/patterns', label: 'Patterns', icon: RotateCcw },
-    { path: '/payees', label: 'Payees', icon: Users },
     { path: '/visualization', label: 'Visualize', icon: TrendingUp },
   ];
+
+  const setupItems = [
+    { path: '/treemap', label: 'Categories', icon: TreePine },
+    { path: '/payees', label: 'Payees', icon: Users },
+    { path: '/patterns', label: 'Patterns', icon: RotateCcw },
+  ];
+
+  // Check if any setup item is active
+  const isSetupActive = setupItems.some(item => location.pathname === item.path);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (setupRef.current && !setupRef.current.contains(event.target as Node)) {
+        setIsSetupOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <nav className="bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border shadow-sm dark:shadow-dark-elevated transition-colors duration-300">
@@ -41,8 +63,8 @@ const Navigation: React.FC<NavigationProps> = ({ stats, onShowPreferences }) => 
                   className={`
                     flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
                     transition-all duration-200 hover:scale-105 active:scale-95
-                    ${location.pathname === path 
-                      ? 'bg-ember-500 text-white shadow-ember-glow dark:bg-ember-600' 
+                    ${location.pathname === path
+                      ? 'bg-ember-500 text-white shadow-ember-glow dark:bg-ember-600'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-warm-400 dark:hover:text-ember-300 dark:hover:bg-dark-card'
                     }
                   `}
@@ -51,6 +73,52 @@ const Navigation: React.FC<NavigationProps> = ({ stats, onShowPreferences }) => 
                   <span>{label}</span>
                 </Link>
               ))}
+
+              {/* Setup Dropdown */}
+              <div className="relative" ref={setupRef}>
+                <button
+                  onClick={() => setIsSetupOpen(!isSetupOpen)}
+                  className={`
+                    flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                    transition-all duration-200 hover:scale-105 active:scale-95
+                    ${isSetupActive
+                      ? 'bg-ember-500 text-white shadow-ember-glow dark:bg-ember-600'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-warm-400 dark:hover:text-ember-300 dark:hover:bg-dark-card'
+                    }
+                  `}
+                >
+                  <Settings size={18} />
+                  <span>Setup</span>
+                  <ChevronDown
+                    size={16}
+                    className={`transition-transform duration-200 ${isSetupOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {/* Dropdown Menu */}
+                {isSetupOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-lg shadow-lg dark:shadow-dark-elevated overflow-hidden z-50">
+                    {setupItems.map(({ path, label, icon: Icon }) => (
+                      <Link
+                        key={path}
+                        to={path}
+                        onClick={() => setIsSetupOpen(false)}
+                        className={`
+                          flex items-center gap-3 px-4 py-2.5 text-sm font-medium
+                          transition-colors duration-150
+                          ${location.pathname === path
+                            ? 'bg-ember-50 text-ember-600 dark:bg-ember-900/30 dark:text-ember-300'
+                            : 'text-gray-700 hover:bg-gray-50 dark:text-warm-300 dark:hover:bg-dark-surface'
+                          }
+                        `}
+                      >
+                        <Icon size={18} />
+                        <span>{label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           

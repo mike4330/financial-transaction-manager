@@ -518,8 +518,8 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
         }}
         title="Add New Category"
       >
-        <div style={{ padding: '1rem 0' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>
             Category Name:
           </label>
           <input
@@ -527,13 +527,7 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
             value={newCategoryName}
             onChange={(e) => setNewCategoryName(e.target.value)}
             placeholder="e.g., Shopping"
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-            }}
+            className={styles.formInput}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
                 handleAddCategory();
@@ -541,34 +535,20 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
             }}
             autoFocus
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+          <div className={styles.buttonGroup}>
             <button
               onClick={() => {
                 setIsAddCategoryDialogOpen(false);
                 setNewCategoryName('');
                 setError(null);
               }}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'white',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-              }}
+              className={`${styles.button} ${styles.buttonCancel}`}
             >
               Cancel
             </button>
             <button
               onClick={handleAddCategory}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                fontWeight: '600',
-              }}
+              className={`${styles.button} ${styles.buttonPrimary}`}
             >
               Add Category
             </button>
@@ -587,21 +567,15 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
         }}
         title="Edit Category"
       >
-        <div style={{ padding: '1rem 0' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>
             Category Name:
           </label>
           <input
             type="text"
             value={newCategoryName}
             onChange={(e) => setNewCategoryName(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-            }}
+            className={styles.formInput}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
                 handleEditCategory();
@@ -609,7 +583,7 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
             }}
             autoFocus
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+          <div className={styles.buttonGroup}>
             <button
               onClick={() => {
                 setIsEditCategoryDialogOpen(false);
@@ -617,27 +591,13 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
                 setEditingCategory(null);
                 setError(null);
               }}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'white',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-              }}
+              className={`${styles.button} ${styles.buttonCancel}`}
             >
               Cancel
             </button>
             <button
               onClick={handleEditCategory}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                fontWeight: '600',
-              }}
+              className={`${styles.button} ${styles.buttonSecondary}`}
             >
               Save Changes
             </button>
@@ -656,8 +616,8 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
         }}
         title={`Add Subcategory to ${selectedCategoryForSub?.name || ''}`}
       >
-        <div style={{ padding: '1rem 0' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>
             Subcategory Name:
           </label>
           <input
@@ -665,13 +625,7 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
             value={newSubcategoryName}
             onChange={(e) => setNewSubcategoryName(e.target.value)}
             placeholder="e.g., Online"
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-            }}
+            className={styles.formInput}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
                 handleAddSubcategory();
@@ -679,7 +633,7 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
             }}
             autoFocus
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+          <div className={styles.buttonGroup}>
             <button
               onClick={() => {
                 setIsAddSubcategoryDialogOpen(false);
@@ -687,27 +641,13 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
                 setSelectedCategoryForSub(null);
                 setError(null);
               }}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'white',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-              }}
+              className={`${styles.button} ${styles.buttonCancel}`}
             >
               Cancel
             </button>
             <button
               onClick={handleAddSubcategory}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                fontWeight: '600',
-              }}
+              className={`${styles.button} ${styles.buttonPrimary}`}
             >
               Add Subcategory
             </button>
@@ -726,21 +666,15 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
         }}
         title="Edit Subcategory"
       >
-        <div style={{ padding: '1rem 0' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>
             Subcategory Name:
           </label>
           <input
             type="text"
             value={newSubcategoryName}
             onChange={(e) => setNewSubcategoryName(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-            }}
+            className={styles.formInput}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
                 handleEditSubcategory();
@@ -748,7 +682,7 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
             }}
             autoFocus
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+          <div className={styles.buttonGroup}>
             <button
               onClick={() => {
                 setIsEditSubcategoryDialogOpen(false);
@@ -756,27 +690,13 @@ const TreeMap: React.FC<TreeMapProps> = ({ onNavigateToTransactions }) => {
                 setEditingSubcategory(null);
                 setError(null);
               }}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'white',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-              }}
+              className={`${styles.button} ${styles.buttonCancel}`}
             >
               Cancel
             </button>
             <button
               onClick={handleEditSubcategory}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                fontWeight: '600',
-              }}
+              className={`${styles.button} ${styles.buttonSecondary}`}
             >
               Save Changes
             </button>
