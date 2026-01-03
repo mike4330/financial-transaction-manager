@@ -11,6 +11,7 @@ import Budget from './components/Budget';
 import RecurringPatterns from './components/RecurringPatterns';
 import PayeeManager from './components/PayeeManager';
 import TransactionVisualization from './components/TransactionVisualization';
+import Reports from './components/Reports';
 
 const App: React.FC = () => {
   return (
@@ -31,6 +32,7 @@ const App: React.FC = () => {
               <Route path="/patterns" element={<RecurringPatterns />} />
               <Route path="/payees" element={<PayeeManager />} />
               <Route path="/visualization" element={<TransactionVisualization />} />
+              <Route path="/reports" element={<Reports />} />
               {/* Fallback route */}
               <Route path="*" element={<Dashboard />} />
             </Routes>

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, CreditCard, Users, TreePine, DollarSign, RotateCcw, Settings, TrendingUp, ChevronDown } from 'lucide-react';
+import { BarChart3, CreditCard, Users, TreePine, DollarSign, RotateCcw, Settings, TrendingUp, ChevronDown, FileText } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { FileUpload } from './FileUpload';
 
@@ -19,6 +19,7 @@ const Navigation: React.FC<NavigationProps> = ({ stats, onShowPreferences }) => 
     { path: '/', label: 'Dashboard', icon: BarChart3 },
     { path: '/transactions', label: 'Transactions', icon: CreditCard },
     { path: '/budget', label: 'Budget', icon: DollarSign },
+    { path: '/reports', label: 'Reports', icon: FileText },
     { path: '/visualization', label: 'Visualize', icon: TrendingUp },
   ];
 
