@@ -82,6 +82,45 @@
   box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
 }
 
+.exportButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background-color: #d97706;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.exportButton:hover {
+  background-color: #b45309;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.exportButton:active {
+  transform: translateY(1px);
+}
+
+.exportButton:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.3);
+}
+
+:global(.dark) .exportButton {
+  background-color: #d97706;
+  color: #1c1510;
+}
+
+:global(.dark) .exportButton:hover {
+  background-color: #f59e0b;
+}
+
 .summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));

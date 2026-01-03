@@ -26,6 +26,69 @@ python3 api_server.py          # Terminal 1 - Backend on :5000
 cd frontend && pnpm run dev     # Terminal 2 - Frontend on :3001
 ```
 
+## Service Management
+
+**IMPORTANT:** The app runs as systemd services in production. Always use these commands to restart properly.
+
+### Proper Restart Procedure
+
+```bash
+# Full clean restart (RECOMMENDED - prevents port conflicts)
+sudo systemctl stop financial-tracker-backend
+sudo systemctl stop financial-tracker-frontend
+sudo pkill -f api_server.py    # Kill any lingering backend processes
+sudo pkill -f vite              # Kill any lingering Vite processes
+sleep 2
+sudo systemctl start financial-tracker-backend
+sudo systemctl start financial-tracker-frontend
+
+# Verify services are running correctly
+sudo systemctl status financial-tracker-backend --no-pager
+sudo systemctl status financial-tracker-frontend --no-pager
+
+# Frontend should show: "➜  Network: http://5.78.137.108:3001/"
+# If it shows port 3002, there's a port conflict - run the full restart again
+```
+
+### Quick Restart (if no port conflicts)
+
+```bash
+# Restart both services
+sudo systemctl restart financial-tracker-backend
+sudo systemctl restart financial-tracker-frontend
+```
+
+### Service Status & Logs
+
+```bash
+# Check service status
+sudo systemctl status financial-tracker-backend
+sudo systemctl status financial-tracker-frontend
+
+# View recent logs
+sudo journalctl -u financial-tracker-backend -n 50
+sudo journalctl -u financial-tracker-frontend -n 50
+
+# Follow logs in real-time
+sudo journalctl -u financial-tracker-backend -f
+sudo journalctl -u financial-tracker-frontend -f
+
+# Check for port conflicts
+sudo ss -tulpn | grep -E ":(3001|5000)"
+sudo lsof -i :3001 -i :5000
+```
+
+### Common Issues
+
+- **Port 3001 conflict**: Frontend starts on port 3002 instead of 3001
+  - **Fix**: Use the full clean restart procedure above
+
+- **Backend port 5000 conflict**: API server fails to start
+  - **Fix**: `sudo pkill -f api_server.py` then restart service
+
+- **Service won't stop**: Process remains after systemctl stop
+  - **Fix**: Use `sudo pkill -f` to force kill, then restart
+
 ## Key Development Standards
 
 ### Frontend

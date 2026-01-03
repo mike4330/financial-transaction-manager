@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronDown, FileDown } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import styles from './Reports.module.css';
 
 interface Subcategory {
@@ -87,6 +89,72 @@ const Reports: React.FC = () => {
     }).format(amount);
   };
 
+  const exportToPDF = () => {
+    if (!data) return;
+
+    const doc = new jsPDF();
+
+    // Title
+    doc.setFontSize(18);
+    doc.text(`Yearly Expense Report - ${data.year}`, 14, 22);
+
+    // Summary information
+    doc.setFontSize(11);
+    doc.text(`Total Expenses: ${formatCurrency(data.total_spending)}`, 14, 32);
+    doc.text(`Categories: ${data.categories.length}`, 14, 38);
+    doc.text(`Total Transactions: ${data.categories.reduce((sum, c) => sum + c.transaction_count, 0).toLocaleString()}`, 14, 44);
+
+    // Prepare table data
+    const tableData = data.categories.map(category => [
+      category.category,
+      formatCurrency(category.amount),
+      `${category.percentage.toFixed(1)}%`,
+      category.transaction_count.toLocaleString()
+    ]);
+
+    // Add table
+    autoTable(doc, {
+      head: [['Category', 'Amount', '% of Total', 'Transactions']],
+      body: tableData,
+      startY: 52,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [66, 66, 66],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right' }
+      }
+    });
+
+    // Add total row
+    const finalY = (doc as any).lastAutoTable.finalY;
+    autoTable(doc, {
+      body: [[
+        'Total',
+        formatCurrency(data.total_spending),
+        '100.0%',
+        data.categories.reduce((sum, c) => sum + c.transaction_count, 0).toLocaleString()
+      ]],
+      startY: finalY,
+      theme: 'plain',
+      styles: {
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right' }
+      }
+    });
+
+    // Save the PDF
+    doc.save(`expense-report-${data.year}.pdf`);
+  };
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -132,6 +200,11 @@ const Reports: React.FC = () => {
               </option>
             ))}
           </select>
+
+          <button onClick={exportToPDF} className={styles.exportButton}>
+            <FileDown size={18} />
+            Export PDF
+          </button>
         </div>
       </div>
 
