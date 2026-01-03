@@ -191,6 +191,79 @@
   background-color: #1c1510;
 }
 
+.categoryRow {
+  font-weight: 600;
+}
+
+.categoryRow.clickable {
+  cursor: pointer;
+}
+
+.categoryRow.clickable:hover {
+  background-color: #f3f4f6;
+}
+
+:global(.dark) .categoryRow.clickable:hover {
+  background-color: #252017;
+}
+
+.subcategoryRow {
+  background-color: #fafafa;
+}
+
+.subcategoryRow:hover {
+  background-color: #f5f5f5;
+}
+
+:global(.dark) .subcategoryRow {
+  background-color: #1c1510;
+}
+
+:global(.dark) .subcategoryRow:hover {
+  background-color: #211a12;
+}
+
+.categoryCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.expandIcon {
+  display: flex;
+  align-items: center;
+  color: #6b7280;
+  transition: color 0.2s;
+}
+
+:global(.dark) .expandIcon {
+  color: #a8a29e;
+}
+
+.categoryName {
+  font-weight: 600;
+}
+
+.subcategoryCount {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+:global(.dark) .subcategoryCount {
+  color: #78716c;
+}
+
+.subcategoryCell {
+  padding-left: 2.5rem;
+  font-weight: 400;
+  color: #4b5563;
+}
+
+:global(.dark) .subcategoryCell {
+  color: #d6d3d1;
+}
+
 .td {
   padding: 0.875rem 1rem;
   color: #1f2937;

@@ -3028,17 +3028,51 @@ def get_yearly_category_totals():
 
         conn.close()
 
-        # Format response
-        categories = []
+        # Format response - group by category with subcategories nested
+        categories_dict = {}
         for row in category_totals:
+            category_name = row['category']
+            subcategory_name = row['subcategory']
             amount = float(row['total_amount'])
-            categories.append({
-                "category": row['category'],
-                "subcategory": row['subcategory'],
-                "amount": amount,
-                "transaction_count": row['transaction_count'],
-                "percentage": (amount / total_spending * 100) if total_spending and total_spending > 0 else 0
-            })
+            transaction_count = row['transaction_count']
+
+            # Initialize category if not exists
+            if category_name not in categories_dict:
+                categories_dict[category_name] = {
+                    "category": category_name,
+                    "amount": 0,
+                    "transaction_count": 0,
+                    "subcategories": []
+                }
+
+            # Add to category total
+            categories_dict[category_name]["amount"] += amount
+            categories_dict[category_name]["transaction_count"] += transaction_count
+
+            # Add subcategory if it exists
+            if subcategory_name:
+                categories_dict[category_name]["subcategories"].append({
+                    "subcategory": subcategory_name,
+                    "amount": amount,
+                    "transaction_count": transaction_count
+                })
+
+        # Convert to list and calculate percentages
+        categories = []
+        for category_data in categories_dict.values():
+            category_data["percentage"] = (category_data["amount"] / total_spending * 100) if total_spending and total_spending > 0 else 0
+
+            # Calculate percentages for subcategories
+            for subcat in category_data["subcategories"]:
+                subcat["percentage"] = (subcat["amount"] / total_spending * 100) if total_spending and total_spending > 0 else 0
+
+            # Sort subcategories by amount descending
+            category_data["subcategories"].sort(key=lambda x: x["amount"], reverse=True)
+
+            categories.append(category_data)
+
+        # Sort categories by amount descending
+        categories.sort(key=lambda x: x["amount"], reverse=True)
 
         return jsonify({
             "year": year,

@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 import styles from './Reports.module.css';
 
-interface CategoryTotal {
-  category: string;
-  subcategory: string | null;
+interface Subcategory {
+  subcategory: string;
   amount: number;
   transaction_count: number;
   percentage: number;
+}
+
+interface CategoryTotal {
+  category: string;
+  amount: number;
+  transaction_count: number;
+  percentage: number;
+  subcategories: Subcategory[];
 }
 
 interface YearlyCategoryData {
@@ -21,6 +29,7 @@ const Reports: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchYearlyData(selectedYear);
@@ -56,6 +65,18 @@ const Reports: React.FC = () => {
 
   const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedYear(parseInt(event.target.value));
+  };
+
+  const toggleCategory = (categoryName: string) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryName)) {
+        newSet.delete(categoryName);
+      } else {
+        newSet.add(categoryName);
+      }
+      return newSet;
+    });
   };
 
   const formatCurrency = (amount: number) => {
@@ -122,7 +143,7 @@ const Reports: React.FC = () => {
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Categories</div>
           <div className={styles.summaryValue}>
-            {new Set(data.categories.map(c => c.category)).size}
+            {data.categories.length}
           </div>
         </div>
         <div className={styles.summaryCard}>
@@ -138,28 +159,62 @@ const Reports: React.FC = () => {
           <thead>
             <tr>
               <th className={styles.th}>Category</th>
-              <th className={styles.th}>Subcategory</th>
               <th className={styles.thRight}>Amount</th>
               <th className={styles.thRight}>% of Total</th>
               <th className={styles.thRight}>Transactions</th>
             </tr>
           </thead>
           <tbody>
-            {data.categories.map((item, index) => (
-              <tr key={index} className={styles.row}>
-                <td className={styles.td}>{item.category}</td>
-                <td className={styles.td}>
-                  {item.subcategory || <span className={styles.noSubcategory}>—</span>}
-                </td>
-                <td className={styles.tdRight}>{formatCurrency(item.amount)}</td>
-                <td className={styles.tdRight}>{item.percentage.toFixed(1)}%</td>
-                <td className={styles.tdRight}>{item.transaction_count.toLocaleString()}</td>
-              </tr>
+            {data.categories.map((category, index) => (
+              <React.Fragment key={index}>
+                {/* Category Row */}
+                <tr
+                  className={`${styles.row} ${styles.categoryRow} ${category.subcategories.length > 0 ? styles.clickable : ''}`}
+                  onClick={() => category.subcategories.length > 0 && toggleCategory(category.category)}
+                >
+                  <td className={styles.td}>
+                    <div className={styles.categoryCell}>
+                      {category.subcategories.length > 0 && (
+                        <span className={styles.expandIcon}>
+                          {expandedCategories.has(category.category) ? (
+                            <ChevronDown size={18} />
+                          ) : (
+                            <ChevronRight size={18} />
+                          )}
+                        </span>
+                      )}
+                      <span className={styles.categoryName}>{category.category}</span>
+                      {category.subcategories.length > 0 && (
+                        <span className={styles.subcategoryCount}>
+                          ({category.subcategories.length})
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className={styles.tdRight}>{formatCurrency(category.amount)}</td>
+                  <td className={styles.tdRight}>{category.percentage.toFixed(1)}%</td>
+                  <td className={styles.tdRight}>{category.transaction_count.toLocaleString()}</td>
+                </tr>
+
+                {/* Subcategory Rows */}
+                {expandedCategories.has(category.category) && category.subcategories.map((subcat, subIndex) => (
+                  <tr key={`${index}-${subIndex}`} className={`${styles.row} ${styles.subcategoryRow}`}>
+                    <td className={styles.td}>
+                      <div className={styles.subcategoryCell}>
+                        {subcat.subcategory}
+                      </div>
+                    </td>
+                    <td className={styles.tdRight}>{formatCurrency(subcat.amount)}</td>
+                    <td className={styles.tdRight}>{subcat.percentage.toFixed(1)}%</td>
+                    <td className={styles.tdRight}>{subcat.transaction_count.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </React.Fragment>
             ))}
           </tbody>
           <tfoot>
             <tr className={styles.totalRow}>
-              <td className={styles.tdBold} colSpan={2}>Total</td>
+              <td className={styles.tdBold}>Total</td>
               <td className={styles.tdRightBold}>{formatCurrency(data.total_spending)}</td>
               <td className={styles.tdRightBold}>100.0%</td>
               <td className={styles.tdRightBold}>
