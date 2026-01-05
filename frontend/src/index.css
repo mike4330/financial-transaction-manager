@@ -223,3 +223,47 @@ code {
   border-radius: 0.25rem;
   font-family: monospace;
 }
+
+/* Mobile: hide page title on transactions page */
+@media (max-width: 768px) {
+  .container h1.text-3xl {
+    display: none;
+  }
+
+  .container {
+    padding: 0.5rem;
+  }
+
+  /* Hide navbar on mobile */
+  nav {
+    display: none !important;
+  }
+
+  /* Hide time range selector on mobile */
+  .max-w-7xl > .mb-6 {
+    display: none !important;
+  }
+
+  /* Reduce main content padding on mobile */
+  .max-w-7xl {
+    padding: 0 !important;
+  }
+
+  /* Remove padding from body/main areas */
+  .min-h-screen {
+    padding: 0 !important;
+  }
+
+  body {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Remove card wrapper styling on mobile */
+  .card {
+    background: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}

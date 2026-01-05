@@ -1276,3 +1276,104 @@
   font-style: italic;
   margin: 0;
 }
+
+/* Mobile Card View */
+.mobileCardContainer {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Hide all UI elements except cards */
+  .filtersContainer,
+  .summaryContainer,
+  .bulkActions {
+    display: none !important;
+  }
+
+  /* Hide table on mobile */
+  .tableContainer {
+    display: none;
+  }
+
+  /* Show card view on mobile */
+  .mobileCardContainer {
+    display: block;
+    width: 95vw;
+    margin: 0 auto;
+  }
+
+  .transactionCard {
+    background-color: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    width: 100%;
+  }
+
+  :global(.dark) .transactionCard {
+    background-color: #252017;
+    border-color: #3a2f20;
+  }
+
+  .cardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  :global(.dark) .cardHeader {
+    border-bottom-color: #3a2f20;
+  }
+
+  .cardDate {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  :global(.dark) .cardDate {
+    color: #a8a29e;
+  }
+
+  .cardAmount {
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .cardBody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .cardRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+  }
+
+  .cardLabel {
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  :global(.dark) .cardLabel {
+    color: #a8a29e;
+  }
+
+  .cardValue {
+    color: #111827;
+    font-weight: 400;
+    text-align: right;
+  }
+
+  :global(.dark) .cardValue {
+    color: #f3f4f6;
+  }
+}

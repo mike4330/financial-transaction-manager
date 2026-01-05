@@ -1100,6 +1100,96 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ initialFilters }) =
             </div>
           </div>
         )}
+
+        {/* Mobile Card View */}
+        {!loading && !error && (
+          <div className={styles.mobileCardContainer}>
+            {transactions.map((transaction) => (
+              <div key={transaction.id} className={styles.transactionCard}>
+                <div className={styles.cardHeader}>
+                  <div className={styles.cardDate}>{formatDate(transaction.date)}</div>
+                  <div className={`${styles.cardAmount} ${transaction.amount < 0 ? styles.amountNegative : styles.amountPositive}`}>
+                    {formatCurrency(transaction.amount)}
+                  </div>
+                </div>
+                <div className={styles.cardBody}>
+                  <div className={styles.cardRow}>
+                    <span className={styles.cardLabel}>Account:</span>
+                    <span className={styles.cardValue}>{transaction.account}</span>
+                  </div>
+                  <div className={styles.cardRow}>
+                    <span className={styles.cardLabel}>Payee:</span>
+                    <span className={styles.cardValue}>{transaction.payee || '-'}</span>
+                  </div>
+                  <div className={styles.cardRow}>
+                    <span className={styles.cardLabel}>Category:</span>
+                    <span className={styles.cardValue}>
+                      <span
+                        className={`${styles.categorySpan} ${transaction.category ? styles.categoryColored : styles.uncategorized}`}
+                        style={transaction.category ? getCategoryColor(transaction.category, false) : undefined}
+                      >
+                        {transaction.category || 'Uncategorized'}
+                      </span>
+                    </span>
+                  </div>
+                  {transaction.subcategory && (
+                    <div className={styles.cardRow}>
+                      <span className={styles.cardLabel}>Subcategory:</span>
+                      <span className={styles.cardValue}>
+                        <span
+                          className={styles.categorySpan}
+                          style={getCategoryColor(transaction.subcategory, true)}
+                        >
+                          {transaction.subcategory}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Pagination Controls */}
+            <div className={styles.paginationContainer}>
+              <div className={styles.paginationInfo}>
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalTransactions)} of {totalTransactions.toLocaleString()} transactions
+              </div>
+              <div className={styles.paginationControls}>
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className={styles.paginationButton}
+                >
+                  First
+                </button>
+                <button
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className={styles.paginationButton}
+                >
+                  Previous
+                </button>
+                <span className={styles.paginationInfo}>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className={styles.paginationButton}
+                >
+                  Next
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className={styles.paginationButton}
+                >
+                  Last
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Dialog */}
