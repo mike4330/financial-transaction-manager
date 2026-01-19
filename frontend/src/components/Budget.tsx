@@ -911,35 +911,28 @@ const Budget: React.FC = () => {
         <div className={styles.summary}>
           <div className={styles.summaryCard}>
             <h3>Income</h3>
-            <div className={styles.summaryAmount}>
-              <span className={styles.actualAmount}>
-                ${totalDisplayIncome.toLocaleString()}
-              </span>
-            </div>
-            <div className={styles.summarySubtext}>
-              Budget: ${totalBudgetedIncome.toLocaleString()}
+            <div className={styles.summaryValues}>
+              <span className={styles.currentValue}>${totalDisplayIncome.toLocaleString()}</span>
+              <span className={styles.separator}>/</span>
+              <span className={styles.budgetValue}>${totalBudgetedIncome.toLocaleString()}</span>
             </div>
           </div>
           <div className={styles.summaryCard}>
             <h3>Expenses</h3>
-            <div className={styles.summaryAmount}>
-              <span className={styles.actualAmount}>
-                ${totalDisplayExpenses.toLocaleString()}
-              </span>
-            </div>
-            <div className={styles.summarySubtext}>
-              Budget: ${totalBudgetedExpenses.toLocaleString()}
+            <div className={styles.summaryValues}>
+              <span className={styles.currentValue}>${totalDisplayExpenses.toLocaleString()}</span>
+              <span className={styles.separator}>/</span>
+              <span className={styles.budgetValue}>${totalBudgetedExpenses.toLocaleString()}</span>
             </div>
           </div>
           <div className={styles.summaryCard}>
             <h3>Net</h3>
-            <div className={styles.summaryAmount}>
-              <span className={`${styles.actualAmount} ${(totalDisplayIncome - totalDisplayExpenses) >= 0 ? styles.positive : styles.negative}`}>
+            <div className={styles.summaryValues}>
+              <span className={`${styles.currentValue} ${(totalDisplayIncome - totalDisplayExpenses) >= 0 ? styles.positive : styles.negative}`}>
                 ${(totalDisplayIncome - totalDisplayExpenses).toLocaleString()}
               </span>
-            </div>
-            <div className={styles.summarySubtext}>
-              Budget: ${(totalBudgetedIncome - totalBudgetedExpenses).toLocaleString()}
+              <span className={styles.separator}>/</span>
+              <span className={styles.budgetValue}>${(totalBudgetedIncome - totalBudgetedExpenses).toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -953,7 +946,7 @@ const Budget: React.FC = () => {
             <h3 className={styles.chartTitle}>Spending by Category</h3>
             <div className={styles.pieChartContainer}>
               <div className={styles.pieChartWrapper}>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie
                       data={spendingData.categories.slice(0, 8).map(category => ({
@@ -964,7 +957,7 @@ const Budget: React.FC = () => {
                       }))}
                       cx="50%"
                       cy="50%"
-                      outerRadius={100}
+                      outerRadius={75}
                       innerRadius={0}
                       fill="#8884d8"
                       dataKey="value"
@@ -985,16 +978,17 @@ const Budget: React.FC = () => {
                       ]}
                       labelFormatter={(label) => `${label}`}
                     />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={60}
+                    <Legend
+                      verticalAlign="bottom"
+                      height={50}
                       layout="horizontal"
                       wrapperStyle={{
                         display: 'flex',
                         flexWrap: 'wrap',
                         justifyContent: 'center',
-                        gap: '16px',
-                        paddingTop: '16px'
+                        gap: '8px',
+                        paddingTop: '8px',
+                        fontSize: '0.75rem'
                       }}
                       formatter={(value, entry) => `${value} ($${entry.payload?.value?.toLocaleString()})`}
                     />
